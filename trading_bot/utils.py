@@ -22,7 +22,40 @@ logger = logging.getLogger('train')
 
 plt.set_loglevel('DEBUG')
 
+def calculateFractalsPairs(df, CalculateValues=True, CalculateTimeDiff=True):
+    """Calculate fractals with granted pairs sequence"""
+    # df['fHigh'] = np.where(
+    #   (df['High'] > df['High'].shift(1)) &
+    #   (df['High'] >= df['High'].shift(-1)) &
+    #   (df['High'] > df['High'].shift(2)) &
+    #   (df['High'] >= df['High'].shift(-2))
+    #   , np.True_, np.False_
+    #   )
 
+    df['fLow'] = np.where(
+        (df['Low'] < df['Low'].shift(1)) &
+        (df['Low'] <= df['Low'].shift(-1)) &
+        (df['Low'] < df['Low'].shift(2)) &
+        (df['Low'] <= df['Low'].shift(-2))
+        , np.True_, np.False_
+    )
+    # Calculate High fractal coresponded all Low froctals
+    df['fHigh'] = np.where(df.fLow, df.index.to_series().values.astype("float64"),np.nan)
+    df['fHigh'] = df['fHigh'].fillna(method='ffill')
+    df['fHigh'] = np.where(df.index == df.groupby(['fHigh'])['High'].transform('idxmax'), True, False)
+
+def getStateFractalsValues(df):
+    # Calculate fractal values
+    frac =  pd.DataFrame({'Close':pd.concat([df[df.fLow].Low,
+               pd.Series(np.array(df[df.fHigh].High),
+                         index=np.where(df[df.fHigh].fLow & df[df.fHigh].fHigh,
+                                    df[df.fHigh].index + np.timedelta64(1,'s'),
+                                    df[df.fHigh].index))],
+              verify_integrity=True, sort=True)}
+            )
+    frac.sort_index(inplace=True)
+    # calculate time difference in minets. Add 0 to begin of array to fit to original df shape
+    frac['tDiff'] = np.append([1], np.diff(frac.index.values.astype('datetime64[s]')).astype('int'))
 
 def pltHist(dfin, hist, fName=None,startFrom=0):
     shift = startFrom #hist[0][0] if hist else 0
@@ -393,3 +426,19 @@ class Data1(Data):
         #     res = res + data.iloc[-(n_days - len(res) + 1):].diff().iloc[-(n_days - len(res)):].apply(expit).to_list()
         res = np.array([block])
         return res
+
+    class Data2(Data):
+        ver = 'v03'
+        description = '"Fractals paired" 1 level, not expit? diff with last close, MA, AT,State window_size=16'
+
+        def _prepareDf(self):
+            prepMa(self.df)
+            prepAtr(self.df)
+            # prepFractals(self.df)
+            self.df['MIX'] = [OHLCVtoSeries(fractalsExp(win, 3)) for win in self.df.rolling(window=800)]
+            # self.prepData = prepareData(self.df)
+
+        def getState(self, n_days, memory, loc=None, *args, iloc=None, **kwargs):
+            # def get_state3(data: list, t: int, n_days=10, memory=None, dataOHLCV=None):
+            # data = OHLCVtoSeries(fractalsExp(dataOHLCV.iloc[:t], 3))
+            return get_state3(['self.prepData'], iloc, n_days=n_days, memory=memory, dataOHLCV=self.df)

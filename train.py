@@ -83,8 +83,7 @@ from qbroker.broker import qbroker, AllInSizer
 from trading_bot.ops import OHLCVtoSeries,fractalsExp,get_state3
 
 import numpy as np
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
 
 def main(train_stock, val_stock, window_size, batch_size, ep_count,
          strategy="t-dqn", model_name="model_debug", pretrained=False,

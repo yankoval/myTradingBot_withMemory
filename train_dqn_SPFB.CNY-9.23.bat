@@ -15,10 +15,8 @@ SET vdFrom=2023.04.01
 SET vdTo=2023.08.20
 SET pretrained=
 REM --pretrained
-SET val-stock=
-rem D:/share/finam/data/MXI-3.21/minute/fractalsValidate_MXI-3.21.csv
-SET train-stock=
-rem D:/share/finam/data/MXI-3.21/minute/MXI-3.21_fractal_2.csv
+SET val-stock=D:/share/finam/data/MXI-3.21/minute/fractalsValidate_MXI-3.21.csv
+SET train-stock=D:/share/finam/data/MXI-3.21/minute/MXI-3.21_fractal_2.csv
 REM--pretrained  --debug
 SET dataPath=Z:/finam/data/
 SET debug=
