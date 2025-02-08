@@ -11,6 +11,7 @@ from qbroker.broker import Position
 from trading_bot.ops import OHLCVtoSeries,fractalsExp,get_state3
 from trading_bot.moex import candles
 from dateutil import parser
+from sklearn.cluster import KMeans
 
 # Formats Position
 format_position = lambda price: ('$' if price < 0 else '$') + '{0:.2f}'.format(price)
@@ -43,9 +44,8 @@ def calculateFractalsPairs(df, CalculateValues=True, CalculateTimeDiff=True):
     df['fHigh'] = np.where(df.fLow, df.index.to_series().values.astype("float64"),np.nan)
     df['fHigh'] = df['fHigh'].fillna(method='ffill')
     df['fHigh'] = np.where(df.index == df.groupby(['fHigh'])['High'].transform('idxmax'), True, False)
-
 def getStateFractalsValues(df):
-    # Calculate fractal values
+    """ Calculate fractal values and timedeltas """
     frac =  pd.DataFrame({'Close':pd.concat([df[df.fLow].Low,
                pd.Series(np.array(df[df.fHigh].High),
                          index=np.where(df[df.fHigh].fLow & df[df.fHigh].fHigh,
@@ -56,7 +56,47 @@ def getStateFractalsValues(df):
     frac.sort_index(inplace=True)
     # calculate time difference in minets. Add 0 to begin of array to fit to original df shape
     frac['tDiff'] = np.append([1], np.diff(frac.index.values.astype('datetime64[s]')).astype('int'))
+    return frac
+def calcLevels(df,kMeansKwargs={"init":"k-means++", "n_init": 4, "n_clusters": 20}, type='futures',MINSTEP=25,DECIMALS=2):
+    """ db scan setting for level clusterization
+     lernValidateRatio ratio of records out of the forecastiong for validation"""
+    epsLev0, epsLev1  = 800, 0.03 # 0.039
+    fh = df.loc[df.fHigh==True].High.values
+    fl = df.loc[df.fLow==True].Low.values
+    # levels = []
 
+    # Keans
+    kmeans = KMeans(**kMeansKwargs) # , n_clusters=20, n_init=4
+    # x = fl.to_list()#fh.to_list()#+fl.to_list()
+    a = kmeans.fit(np.reshape(fh,(len(fh),1)))
+    fh = np.sort(np.transpose(a.cluster_centers_)[0]).tolist()
+    # x = fh.to_list()#+fl.to_list()
+    b = kmeans.fit(np.reshape(fl,(len(fl),1)))
+    fl = np.sort(np.transpose(b.cluster_centers_)[0]).tolist()
+    levels =  fl+fh
+
+    try:  # ls
+        if type in ['futures_forts', 'futures']:
+            levels = list(map(lambda x: int((x // MINSTEP) * MINSTEP),
+                              levels))  # round as ticker price step
+        elif type in ['stock_index', 'stock_index_eq', 'stock_shares', 'common_share']:
+            levels = list(map(lambda x: round(x, DECIMALS), levels))
+    except:
+        pass  # in INDEX tikers no tikInfo.MINSTEP
+    # chose 10 levels nearest to ticker last close value
+    # close = df.iloc[-1].Close
+    # levels = sorted(levels, key=lambda x: abs(x - close) / close)[:10]
+    levels = sorted(levels)  # final sort to prevent
+    return levels
+def calcLevelsForEachInterval(df:pd.DataFrame,freq:str='D'):
+    """ calculate df with sets of levels for each time step by tDiff as index"""
+    # Generate day range index
+    idx = pd.date_range(start=df.index.min(), end=df.index.max(), freq=freq, normalize=True)
+    # generate levels for each
+    levels = [calcLevels(df.loc[:day + pd.Timedelta('1'+freq)]) for day in idx]
+    # correct time shift to prevent future vision
+    levels = [levels[0]] + levels[:-1]
+    return pd.DataFrame(levels,index=idx)
 def pltHist(dfin, hist, fName=None,startFrom=0):
     shift = startFrom #hist[0][0] if hist else 0
     df = dfin #.copy()
