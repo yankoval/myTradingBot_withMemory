@@ -467,18 +467,53 @@ class Data1(Data):
         res = np.array([block])
         return res
 
-    class Data2(Data):
-        ver = 'v03'
-        description = '"Fractals paired" 1 level, not expit? diff with last close, MA, AT,State window_size=16'
+class Data2(Data):
+    ver = 'v03'
+    description = '"Fractals paired" 1 level, not expit? diff with last close, MA, AT,State window_size=16'
 
-        def _prepareDf(self):
-            prepMa(self.df)
-            prepAtr(self.df)
-            # prepFractals(self.df)
-            self.df['MIX'] = [OHLCVtoSeries(fractalsExp(win, 3)) for win in self.df.rolling(window=800)]
-            # self.prepData = prepareData(self.df)
+    def _prepareDf(self):
+        prepMa(self.df)
+        prepAtr(self.df)
+        # prepFractals(self.df)
+        self.df['MIX'] = [OHLCVtoSeries(fractalsExp(win, 3)) for win in self.df.rolling(window=800)]
+        # self.prepData = prepareData(self.df)
 
-        def getState(self, n_days, memory, loc=None, *args, iloc=None, **kwargs):
-            # def get_state3(data: list, t: int, n_days=10, memory=None, dataOHLCV=None):
-            # data = OHLCVtoSeries(fractalsExp(dataOHLCV.iloc[:t], 3))
-            return get_state3(['self.prepData'], iloc, n_days=n_days, memory=memory, dataOHLCV=self.df)
+    def getState(self, n_days, memory, loc=None, *args, iloc=None, **kwargs):
+        # def get_state3(data: list, t: int, n_days=10, memory=None, dataOHLCV=None):
+        # data = OHLCVtoSeries(fractalsExp(dataOHLCV.iloc[:t], 3))
+        return get_state3(['self.prepData'], iloc, n_days=n_days, memory=memory, dataOHLCV=self.df)
+
+class Data3(Data1):
+    """ Fractals pairs, with levels diff. Based on Data1 """
+    ver = 'v03'
+    def __init__(self, *args, **kwargs):
+        self.window_size = kwargs['window_size']
+        super().__init__(*args, **kwargs)
+    def _prepareDf(self):
+        super()._prepareDf()
+        calculateFractalsPairs(self.df)
+        self.fractalsValues = getStateFractalsValues(self.df)
+        self.dfLevels = calcLevelsForEachInterval(self.df)
+        for idx, row in self.df.iterrows():
+            self.df.at[idx, 'nLevel'] = \
+            sorted(self.dfLevels.loc[idx.floor(freq='D')], key=lambda x: abs(x - row.Close) / row.Close)[0]
+        self.dff = pd.DataFrame([np.array(self.fractalsValues.loc[self.fractalsValues.index<idx].Close[-self.window_size+1:])-
+                                 self.df.loc[idx].nLevel for idx,row in self.df.iterrows()],index=self.df.index)
+    def getState(self, n_days, memory, loc=None, *args, iloc=None, **kwargs):
+        """Returns an n-day state representation ending at time t
+        """
+        # data = OHLCVtoSeries(fractalsExp(self.df.iloc[:iloc], 3))
+        data = self.dff.iloc[iloc].apply(expit).values
+        # block = data.iloc[-n_days:]  # if d >= 0 else -d * [data.iloc[0]] + data.iloc[0: t + 1]  # pad with t0
+        # res = []
+        # Запишем текущий профит если сделка была
+        profit = expit(self.df['Close'].iloc[iloc] - memory[-1]) if memory else 0.5
+
+        # Запишем цену последней сделки относительно цены последнего фрактала
+        # res.append(expit(self.df['Close'].iloc[iloc] - data.iloc[-1]))
+
+        # Запишем данные цен фракталов относительно цен соответсвующих им предидущих фркталов
+        # res = res + data.iloc[-(n_days - len(res) + 1):].diff().iloc[-(n_days - len(res)):].apply(expit).to_list()
+        res = np.append(profit, data)
+        return np.array([res])
+

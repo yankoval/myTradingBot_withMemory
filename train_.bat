@@ -5,14 +5,14 @@ SET batch-size=32
 REM dqn double-dqn deff: t-dqn
 SET strategy=t-dqn
 SET trStrat=long
-IF NOT [%1]==[]  (SET tik=%1) ELSE (SET tik=SBER)
+IF NOT [%1]==[]  (SET tik=%1) ELSE (SET tik=MXZ4)
 SET tFrame=hourly
 SET episode-count=100
 SET tfCounts=10000
-SET dFrom=2022.01.17
-SET dTo=2023.04.01
-SET vdFrom=2023.04.01
-SET vdTo=2023.08.20
+SET dFrom=2024.09.01
+SET dTo=2024.12.01
+SET vdFrom=2024.12.01
+SET vdTo=2024.12.31
 SET pretrained=
 REM --pretrained
 SET val-stock=
@@ -20,7 +20,7 @@ rem D:/share/finam/data/MXI-3.21/minute/fractalsValidate_MXI-3.21.csv
 SET train-stock=
 rem D:/share/finam/data/MXI-3.21/minute/MXI-3.21_fractal_2.csv
 REM--pretrained  --debug
-SET dataPath=Z:/finam/data/
+SET dataPath=C:/Users/ivan/Downloads
 SET debug=
 SET rnd=%RANDOM%
 IF NOT "%train-stock%"=="" (
@@ -34,7 +34,7 @@ SET r= train.py --trStrat=%trStrat% --tik=%tik% --strategy=%strategy% --window-s
 
 
 pushd
-call venv\scripts\activate
+call C:/Users/ivan/PycharmProjects/tradingBotEnv/Scripts/activate
 popd
 cd
 
@@ -42,7 +42,7 @@ cd
 echo %date% %time%: Start %rnd% %r% >> trainTasks.log
 echo Starting
 TITLE %date% %time%:%rnd%:%r:~10,200%
-venv\scripts\python %r%
+C:/Users/ivan/PycharmProjects/tradingBotEnv/Scripts/python %r%
 echo %date% %time%: Finish %rnd% %r% >> trainTasks.log
 
 pause

@@ -77,7 +77,7 @@ from trading_bot.utils import (
     prepareData,
     prepMa,prepAtr,prepFractals
 )
-from trading_bot.utils import Data1 as Data
+from trading_bot.utils import Data3 as Data
 from qbroker.broker import qbroker, AllInSizer
 # from scipy.special import expit
 from trading_bot.ops import OHLCVtoSeries,fractalsExp,get_state3
@@ -145,13 +145,14 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
         # logger.info(f'Prepared train ver:0.1 data shape:{len(train_data)}')
         train_data = Data(val_stock if val_stock else dataPath, tfCounts=tfCounts, tik=tik, tFrame=tFrame,
                               dFrom=dFrom,
-                              dTo=dTo)
+                              dTo=dTo,
+                          window_size=window_size,)
         if not train_data:
             logger.error('Train dataset is empty after preparation.')
             return (-1)
     # val_dataOHLCV = readData(val_stock, dataPath, tfCounts=tfCounts, tik=tik, tFrame=tFrame, dFrom=vdFrom, dTo=vdTo)
     val_dataOHLCV = Data(val_stock if val_stock else dataPath, tfCounts=tfCounts, tik=tik, tFrame=tFrame, dFrom=vdFrom,
-               dTo=vdTo)
+               dTo=vdTo,window_size=window_size,)
     logger.info(f'Validation data data shape:{val_dataOHLCV.df.shape}, tfCounts: {tfCounts}, from:{val_dataOHLCV.df.iloc[0].name} '
                 f'to:{val_dataOHLCV.df.iloc[tfCounts if val_dataOHLCV.df.shape[0] > tfCounts else (val_dataOHLCV.df.shape[0] - 1)].name}.')
     assert val_dataOHLCV.df.shape[0] > 800 , f'Shape:{val_dataOHLCV.df.shape} < 800.'
