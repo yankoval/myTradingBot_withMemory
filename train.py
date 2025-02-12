@@ -6,7 +6,7 @@ Usage:
   train.py [--train-stock=<train-stock>] [--val-stock=<val-stock>] [--strategy=<strategy>]
     [--window-size=<window-size>] [--batch-size=<batch-size>]
     [--episode-count=<episode-count>] [--model-name=<model-name>]
-    [--pretrained] [--debug] [--tfCounts=<tf-Counts>]  [--tik=<tiker>]
+    [--pretrained] [--debug] [--log_dir=<log_dir>][--tfCounts=<tf-Counts>]  [--tik=<tiker>]
     [--tFrame=<tFrame>] [--dFrom=<dFrom>] [--dTo=<dTo>]
     [--vdFrom=<vdFrom>] [--vdTo=<vdTo>] [--trStrat=<trStrat>] [--trainId=<trainId>]
     [--dataPath=<dataPath>] [--evaluate_only=<evaluate_only>]
@@ -122,7 +122,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
     logger = logging.getLogger('train')
     
     # Create a file handler object
-    fh = logging.FileHandler(f'{(Path.cwd() / "logs" / (model_name+("_eval"if evaluate_only else "")))}.log')
+    fh = logging.FileHandler(f'{(Path(log_dir) / (model_name+("_eval"if evaluate_only else "")))}.log')
     fh.setLevel(logging.DEBUG if debug else logging.INFO)
     
     # Create a ColoredFormatter to use as formatter for the FileHandler
