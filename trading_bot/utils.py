@@ -98,6 +98,7 @@ def calcLevelsForEachInterval(df:pd.DataFrame,freq:str='D'):
     levels = [levels[0]] + levels[:-1]
     return pd.DataFrame(levels,index=idx)
 def pltHist(dfin, hist, fName=None,startFrom=0):
+    logger.debug(f'pltHist started.')
     shift = startFrom #hist[0][0] if hist else 0
     df = dfin #.copy()
     df = df.iloc[shift:]
@@ -151,10 +152,11 @@ def pltHist(dfin, hist, fName=None,startFrom=0):
     major_ticks_y = np.arange(df.Low.min(), df.High.max(), dRange / 6)
     minor_ticks_y = np.arange(df.Low.min(), df.High.max(), dRange / 12)
 
-
+    logger.debug(f'plt begining...')
     try:
         fig, (ax0, ax1, axmdd,axProb,axCash,axValue, ax2) = plt.subplots(7, 1, sharex=True, gridspec_kw={'height_ratios':[1,1,1,1,1,1,6]}
                                             , figsize=(df.shape[0]//15, 8))
+        logger.debug('plt started plt.subplots')
         ax0.plot(df.index, df.portfolio)
         plt.setp(ax0.get_xticklabels(), visible=False)
         ax0.grid(which='both')
