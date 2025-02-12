@@ -145,13 +145,16 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
         #             f'to:{train_dataOHLCV.iloc[tfCounts if train_dataOHLCV.shape[0]>tfCounts else (train_dataOHLCV.shape[0]-1)].name}.')
         # train_data = prepareData(train_dataOHLCV)
         # logger.info(f'Prepared train ver:0.1 data shape:{len(train_data)}')
-        train_data = Data(val_stock if val_stock else dataPath, tfCounts=tfCounts, tik=tik, tFrame=tFrame,
+        train_data = Data(train_stock if train_stock else dataPath, tfCounts=tfCounts, tik=tik, tFrame=tFrame,
                               dFrom=dFrom,
                               dTo=dTo,
                           window_size=window_size,)
         if not train_data:
             logger.error('Train dataset is empty after preparation.')
             return (-1)
+        logger.info(
+            f'Train data shape:{train_data.df.shape}, tfCounts: {tfCounts}, from:{train_data.df.iloc[0].name} '
+            f'to:{train_data.df.iloc[tfCounts if train_data.df.shape[0] > tfCounts else (train_data.df.shape[0] - 1)].name}.')
     # val_dataOHLCV = readData(val_stock, dataPath, tfCounts=tfCounts, tik=tik, tFrame=tFrame, dFrom=vdFrom, dTo=vdTo)
     val_dataOHLCV = Data(val_stock if val_stock else dataPath, tfCounts=tfCounts, tik=tik, tFrame=tFrame, dFrom=vdFrom,
                dTo=vdTo,window_size=window_size,)
