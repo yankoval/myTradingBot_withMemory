@@ -373,6 +373,7 @@ def readFinam(tik,dataPath:str,*agrs,tFrame='daily',dFrom=None,dTo=None,skiprows
                         )
         if dfTmp.shape[0] == 0:  # chek df is empty then exit
             logger.debug('Finished loading.')
+            break
         df = pd.concat([df, dfTmp])
 
     for i, name in enumerate(['Open', 'Close', 'High', 'Low', 'value', 'Volume']):
