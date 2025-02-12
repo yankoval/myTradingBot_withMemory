@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name='myTradingBot_withMemory',
     version='1.0',
-    packages=['qbroker', 'trading_bot'],
+    packages=['qbroker', 'trading_bot','train', 'eval'],
     url='',
     license='',
     author='ivan',
