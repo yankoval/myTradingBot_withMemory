@@ -27,6 +27,7 @@ Options:
   --pretrained                      Specifies whether to continue training a previously
                                     trained model (reads `model-name`).
   --debug                           Specifies whether to use verbose logs during eval operation.
+  --log_dir=<log_dir>               logging folder
   --tfCounts=<tf-Counts>            How math rows to get from data source [default: 0]
   --tik=<tiker>                     Tiker from Finam DB default None (read from CSV)
   --tFrame=<tFrame>                 Time frame (daily,hourly,minute,monthly,weekly) [default: daily]
@@ -98,6 +99,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
          ,trainId='0'
          ,dataPath=r'D:/share/finam/data/'
          ,evaluate_only=None
+         ,log_dir=''
          ):
     """ Trains the stock trading bot using Deep Q-Learning.
     Please see https://arxiv.org/abs/1312.5602 for more details.
@@ -240,6 +242,7 @@ if __name__ == "__main__":
     trainId = args["--trainId"]
     dataPath = args["--dataPath"]
     evaluate_only=list(map(int,args["--evaluate_only"].split(','))) if isinstance(args["--evaluate_only"],str) else args["--evaluate_only"]
+    log_dir = args["--log_dir"]
     # Parameters checks
 
     # Check path to data:
@@ -267,6 +270,6 @@ if __name__ == "__main__":
              pretrained=pretrained, debug=debug,tfCounts=tfCounts,
              tik=tik,tFrame=tFrame,dFrom=dFrom,dTo=dTo,vdFrom=vdFrom,
              vdTo=vdTo,trStrat=trStrat, trainId=trainId, dataPath=dataPath
-             ,evaluate_only=evaluate_only)
+             ,evaluate_only=evaluate_only,log_dir=log_dir)
     except KeyboardInterrupt:
         print("Aborted!")
