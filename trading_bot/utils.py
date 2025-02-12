@@ -20,9 +20,21 @@ format_position = lambda price: ('$' if price < 0 else '$') + '{0:.2f}'.format(p
 format_currency = lambda price: '${0:.2f}'.format(abs(price))
 
 logger = logging.getLogger('train')
+logger.setLevel(logging.DEBUG)  # You can adjust the level as needed
+
+# Create a console handler and set its level to DEBUG
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+# Create a formatter and add it to the handler
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+
+# Add the console handler to the logger
+logger.addHandler(console_handler)
+logger.debug('test')
 
 plt.set_loglevel('DEBUG')
-
+logger.debug('test')
 def calculateFractalsPairs(df, CalculateValues=True, CalculateTimeDiff=True):
     """Calculate fractals with granted pairs sequence"""
     # df['fHigh'] = np.where(
