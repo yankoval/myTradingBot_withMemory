@@ -4,6 +4,7 @@ setup(
     name='myTradingBot_withMemory',
     version='1.0',
     packages=['qbroker', 'trading_bot'],
+    py_modules=["train","eval"],
     url='',
     license='',
     author='ivan',
