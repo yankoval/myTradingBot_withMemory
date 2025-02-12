@@ -264,7 +264,7 @@ class Data:
         self.iloc = 0
         self.loc = self.df.index[self.iloc]
         self._prepareDf()
-        self.ver = 'vd0'
+        # self.ver = 'vd0'
     def _prepareDf(self):
         pass
     def getState(self,loc=None,*args,iloc=None,**kwargs):
@@ -334,12 +334,12 @@ def readData(stock_file:str,dataPath:str,*agrs,tfCounts=None,tik=None,tFrame='da
                          )
     else:
         df = pd.read_csv(stock_file
-                         ,*agrs
+                         # ,*agrs
                          ,index_col=['Date']
                          ,parse_dates=['Date']
                          ,skiprows=skiprows
                          ,nrows=nrows
-                         ,**kwargs
+                         # ,**kwargs
                          ).loc[dFrom:dTo]
     df = df.iloc[:tfCounts]
     return df
