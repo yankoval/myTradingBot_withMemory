@@ -99,7 +99,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
          ,trainId='0'
          ,dataPath=r'D:/share/finam/data/'
          ,evaluate_only=None
-         ,log_dir='.'
+         ,log_dir=None
          ):
     """ Trains the stock trading bot using Deep Q-Learning.
     Please see https://arxiv.org/abs/1312.5602 for more details.
@@ -120,7 +120,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
 
     # Create a logger object.
     logger = logging.getLogger('train')
-    log_dir = Path(log_dir)/'logs' if log_dir =='.' else Path(log_dir)
+    log_dir = Path('.')/'logs' if log_dir is None else Path(log_dir)
     if not log_dir.exists():
         print('Log dir changed to current folder.')
         log_dir = Path('.')
