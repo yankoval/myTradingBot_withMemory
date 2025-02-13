@@ -39,7 +39,7 @@ def huber_loss(y_true, y_pred, clip_delta=1.0):
 
 class Agent:
     """ Stock Trading Bot """
-    ver = 'v01'
+    ver = 'v03'
     description = 'Base q-lerning agen and model'
 
     def __init__(self, state_size, strategy="t-dqn", reset_every=1000
@@ -214,7 +214,7 @@ class Agent:
         return loss
 
     def save(self, episode):
-        self.model.save(os.path.join(self.modelPath,f"{self.model_name}_episode_{episode}"))
+        self.model.save(os.path.join(self.modelPath,f"{self.model_name}_episode_{episode}.keras"))
 
     def load(self):
         try:
@@ -225,8 +225,8 @@ class Agent:
 
 
 class AgentF(Agent):
-    ver = 'v02'
-    description = 'Base q-lerning agen and model for fractals seq relu 6 layers'
+    ver = Agent.ver+'.2'
+    description = 'Base q-lerning agen and model for fractals seq relu 6 layers. Keras 3 file format'
 
     def _model(self):
         """Creates the model

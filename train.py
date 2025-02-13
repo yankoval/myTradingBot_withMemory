@@ -38,7 +38,7 @@ Options:
   --trStrat=<trStrat>               trade strategy long, short or both  [default: long]
   --trainId=<trainId>               randomId of train filename suffix  [default: 0]
   --dataPath=<dataPath>             dataPath to DATASETs DB    [default: data]
-  --evaluate_only=<evaluate_only>   evaluate pretrained models range. --evaluate_only=1,2 mean range(1,2)
+  --evaluate_only=<evaluate_only>   evaluate pretrained models episodes range. --evaluate_only=1,2 episodes range(1,2)
 
 """
 
@@ -144,9 +144,9 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
     logger.info(f'dataPath: {dataPath}')
     
     if not evaluate_only:
-        if pretrained:
-            if not Path('models/' + model_name).is_dir():
-                raise RuntimeError(f'There is no models at {Path("models/" + model_name).absolute()}.')
+        # if pretrained:
+        #     if not Path('models/' + model_name).is_dir():
+        #         raise RuntimeError(f'There is no models at {Path("models/" + model_name).absolute()}.')
         # agent = AgentF(window_size, strategy=strategy, pretrained=pretrained, model_name=model_name)
         # train_dataOHLCV = readData(train_stock,dataPath, tfCounts=tfCounts, tik=tik, tFrame=tFrame, dFrom=dFrom, dTo=dTo)
         # if train_dataOHLCV.empty:
@@ -214,6 +214,8 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
 
     # Train model
     agent = Agent(window_size, strategy=strategy, pretrained=pretrained, model_name=model_name)
+    if not pretrained:
+        agent.save(0)
     for episode in range(1, ep_count + 1):
         train_result = train_model(agent, episode, train_data, ep_count=ep_count,
             batch_size=batch_size, window_size=window_size,
