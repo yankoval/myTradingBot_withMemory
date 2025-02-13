@@ -79,7 +79,7 @@ class Agent:
         self.optimizer = Adam(learning_rate=self.learning_rate)
 
         if pretrained:
-            self.model = self.load()
+            self.model = self.load(model_name=model_name)
             config = self.model.get_config()  # Returns pretty much every information about your model
             self.state_size = config["layers"][0]["config"]["batch_input_shape"][1]
             print(f'Loaded model at:{self.model_name}, window size:{self.state_size}.')
@@ -213,18 +213,20 @@ class Agent:
 
         return loss
 
-    def save(self, episode):
-        self.model.save(os.path.join(self.modelPath,f"{self.model_name}_episode_{episode}.keras"))
-
-    def load(self,episode=None):
-        if episode is None:
-            modelPath = os.path.join(self.modelPath, f"{self.model_name}.keras")
+    def save(self, episode=None):
+        if episode:
+            model_name = os.path.join(self.modelPath,f"{self.model_name}_episode_{episode}.keras")
         else:
-            modelPath = os.path.join(self.modelPath,f"{self.model_name}_episode_{episode}.keras")
+            model_name = os.path.join(self.modelPath,f"{self.model_name}.keras")
+        self.model.save(model_name)
+
+    def load(self,model_name=None):
+        """Load saved model, model_name is filename with extension:str"""
+        model_name = model_name if model_name else f"{self.model_name}.keras"
         try:
-            return load_model(modelPath , custom_objects=self.custom_objects)
+            return load_model(os.path.join(self.modelPath, model_name) , custom_objects=self.custom_objects)
         except:
-            print(f'Error reading model from:{modelPath} ')
+            print(f'Error reading model from:{model_name} ')
             raise
 
 

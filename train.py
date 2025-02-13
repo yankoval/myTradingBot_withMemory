@@ -197,8 +197,10 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
     # Evaluate models
     if evaluate_only:
         for i in range(evaluate_only[0],evaluate_only[1]) if len(evaluate_only)>1 else  evaluate_only:
-            evaluate_only_turn = str(i)
-            agent = Agent(None, strategy=strategy, pretrained=True, model_name=model_name + '_' + evaluate_only_turn)
+            agent = Agent(None, strategy=strategy, pretrained=True,
+                        modelPath=(Path.cwd() /'models').absolute().__str__(),
+                        model_name=f"{model_name}_episode_{i}.keras"
+                          )
             # Установим window_size из параметров загруженной модели.
             if window_size != agent.state_size:
                 logger.error(f'window size parameter not match to loadad model. Set window size from loaded model!')
@@ -208,7 +210,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
             show_train_result((1,2,3,4), val_result, initial_offset, history=history, df=val_dataOHLCV
                               ,maxDrawdownAbs=maxDrawdownAbs,modelName=model_name+'_'+evaluate_only_turn,
                               )
-            logger.info(f'Option evaluate_only is: {evaluate_only_turn}!!!!!!!!!!!!!!!!')
+            logger.info(f'Option evaluate_only is: {i}.')
         return
 
 
