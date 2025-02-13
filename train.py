@@ -99,7 +99,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
          ,trainId='0'
          ,dataPath=r'D:/share/finam/data/'
          ,evaluate_only=None
-         ,log_dir=''
+         ,log_dir='.'
          ):
     """ Trains the stock trading bot using Deep Q-Learning.
     Please see https://arxiv.org/abs/1312.5602 for more details.
@@ -120,9 +120,12 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
 
     # Create a logger object.
     logger = logging.getLogger('train')
-    
+    log_dir = Path(log_dir)/'logs' if log_dir =='.' else Path(log_dir)
+    if not log_dir.exists():
+        print('Log dir changed to current folder.')
+        log_dir = Path('.')
     # Create a file handler object
-    fh = logging.FileHandler(f'{(Path(log_dir) / (model_name+("_eval"if evaluate_only else "")))}.log')
+    fh = logging.FileHandler(f'{(log_dir / (model_name+("_eval"if evaluate_only else "")))}.log')
     fh.setLevel(logging.DEBUG if debug else logging.INFO)
     
     # Create a ColoredFormatter to use as formatter for the FileHandler
@@ -132,6 +135,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
     
     coloredlogs.install(level="INFO", fmt=f'%(asctime)s,{model_name}: %(message)s')
  
+    logger.info(f'log_dir: {log_dir}')
     logger.info(f'model_name: {model_name}')
     logger.info(f'dataPath: {dataPath}')
     
@@ -224,6 +228,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
 if __name__ == "__main__":
     print(Path('.').absolute())
     args = docopt(__doc__)
+    print(args)
 
     train_stock = args["--train-stock"]
     val_stock = args["--val-stock"]
