@@ -216,11 +216,15 @@ class Agent:
     def save(self, episode):
         self.model.save(os.path.join(self.modelPath,f"{self.model_name}_episode_{episode}.keras"))
 
-    def load(self):
+    def load(self,episode=None):
+        if episode is None:
+            modelPath = os.path.join(self.modelPath, f"{self.model_name}.keras")
+        else:
+            modelPath = os.path.join(self.modelPath,f"{self.model_name}_episode_{episode}.keras")
         try:
-            return load_model(os.path.join(self.modelPath,self.model_name) , custom_objects=self.custom_objects)
+            return load_model(modelPath , custom_objects=self.custom_objects)
         except:
-            print(f'Error reading model from:{os.getcwd()} and {"models/" + self.model_name}')
+            print(f'Error reading model from:{modelPath} ')
             raise
 
 
