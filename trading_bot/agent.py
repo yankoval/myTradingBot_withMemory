@@ -43,9 +43,13 @@ class Agent:
     description = 'Base q-lerning agen and model'
 
     def __init__(self, state_size, strategy="t-dqn", reset_every=1000
-                 , pretrained=False, model_name=None):
+                 , pretrained=False, model_name=None,modelPath=None):
 
-        print('myTradingBot_withMemory')
+        print(self.description)
+        if modelPath is None:
+            modelPath = os.path.join(os.getcwd(),'models')
+        assert os.path.isdir(modelPath), f'Wrong models path: {modelPath}'
+        self.modelPath = modelPath
 
         # Switch off gpu if not detected
         physical_devices = tf.config.list_physical_devices('GPU')
@@ -210,11 +214,11 @@ class Agent:
         return loss
 
     def save(self, episode):
-        self.model.save(f"models/{self.model_name}_episode_{episode}")
+        self.model.save(os.path.join(self.modelPath,f"{self.model_name}_episode_{episode}"))
 
     def load(self):
         try:
-            return load_model("models/" + self.model_name, custom_objects=self.custom_objects)
+            return load_model(os.path.join(self.modelPath,self.model_name) , custom_objects=self.custom_objects)
         except:
             print(f'Error reading model from:{os.getcwd()} and {"models/" + self.model_name}')
             raise

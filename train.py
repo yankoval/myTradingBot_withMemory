@@ -118,8 +118,13 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
 
     """
 
+    if model_name in ['model_debug',None]:
+        model_name = f'qt_v08_{strategy}_{trStrat}_{window_size}_{batch_size}_{tik}_{tFrame}_Agent_{Agent.ver}_Data_{Data.ver}'
+
     # Create a logger object.
     logger = logging.getLogger('train')
+    coloredlogs.install(level=logging.DEBUG if debug else logging.INFO, fmt=f'%(asctime)s,%(name)s,%(levelname)s,{model_name}: %(message)s', logger=logger)
+
     log_dir = Path('.')/'logs' if log_dir is None else Path(log_dir)
     if not log_dir.exists():
         print('Log dir changed to current folder.')
@@ -127,19 +132,21 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
     # Create a file handler object
     fh = logging.FileHandler(f'{(log_dir / (model_name+("_eval"if evaluate_only else "")))}.log')
     fh.setLevel(logging.DEBUG if debug else logging.INFO)
-    
+
     # Create a ColoredFormatter to use as formatter for the FileHandler
     formatter = coloredlogs.ColoredFormatter(f'%(asctime)s,{model_name}_{trainId}: %(message)s')
     fh.setFormatter(formatter)
     logger.addHandler(fh)
-    
-    coloredlogs.install(level="INFO", fmt=f'%(asctime)s,{model_name}: %(message)s')
- 
+
+
     logger.info(f'log_dir: {log_dir}')
     logger.info(f'model_name: {model_name}')
     logger.info(f'dataPath: {dataPath}')
     
     if not evaluate_only:
+        if pretrained:
+            if not Path('models/' + model_name).is_dir():
+                raise RuntimeError(f'There is no models at {Path("models/" + model_name).absolute()}.')
         # agent = AgentF(window_size, strategy=strategy, pretrained=pretrained, model_name=model_name)
         # train_dataOHLCV = readData(train_stock,dataPath, tfCounts=tfCounts, tik=tik, tFrame=tFrame, dFrom=dFrom, dTo=dTo)
         # if train_dataOHLCV.empty:
@@ -187,8 +194,6 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
         raise
     initial_offset = 0.05
 
-    if model_name in ['model_debug',None]:
-        model_name = f'qt_v08_{strategy}_{trStrat}_{window_size}_{batch_size}_{tik}_{tFrame}_Agent_{Agent.ver}_Data_{Data.ver}'
     # Evaluate models
     if evaluate_only:
         for i in range(evaluate_only[0],evaluate_only[1]) if len(evaluate_only)>1 else  evaluate_only:
@@ -256,9 +261,7 @@ if __name__ == "__main__":
     # Check path to data:
     if not Path(dataPath).is_dir():
         raise RuntimeError(f'There is no data dir at {Path(dataPath).absolute()}.')
-    if pretrained:
-        if not Path('models/'+model_name).is_dir():
-            raise  RuntimeError(f'There is no models at {Path("models/"+model_name).absolute()}.')
+
     # Check strategy
     if not strategy in ["t-dqn", "double-dqn", "dqn"]:
         raise RuntimeError(f'There is no data dir at {Path(dataPath).absolute()}.')
