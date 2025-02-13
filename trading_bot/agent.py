@@ -81,7 +81,10 @@ class Agent:
         if pretrained:
             self.model = self.load(model_name=model_name)
             config = self.model.get_config()  # Returns pretty much every information about your model
-            self.state_size = config["layers"][0]["config"]["batch_input_shape"][1]
+            try:
+                self.state_size = config["layers"][0]["config"]["batch_input_shape"][1]
+            except KeyError:
+                config["layers"][0]["config"]['batch_shape'][1]
             print(f'Loaded model at:{self.model_name}, window size:{self.state_size}.')
         else:
             self.model = self._model()
