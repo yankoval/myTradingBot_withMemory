@@ -208,7 +208,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
                 # window_size = agent.state_size
             val_result, history, maxDrawdownAbs = evaluate_model(agent, val_dataOHLCV, window_size, debug,startFrom=800)
             show_train_result((1,2,3,4), val_result, initial_offset, history=history, df=val_dataOHLCV
-                              ,maxDrawdownAbs=maxDrawdownAbs,modelName=model_name+'_'+evaluate_only_turn,
+                              ,maxDrawdownAbs=maxDrawdownAbs,modelName=model_name+'_'+str(i),
                               )
             logger.info(f'Option evaluate_only is: {i}.')
         return
