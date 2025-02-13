@@ -230,6 +230,11 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
                                                             #, dataOHLCV=val_dataOHLCV.df
                                                             #, brokerFee=0.001
                                                              )
+        try:
+            with open(f'{(log_dir / (model_name + (f"_episode_{ep_count}" )))}.hist','w') as f:
+                f.write(str(history))
+        except Exception as e:
+            logger.error(f'Error writing history log file: {e}')
         show_train_result(train_result, val_result, initial_offset, history=history, df=val_dataOHLCV
                           , modelName=model_name, maxDrawdownAbs=maxDrawdownAbs)
 
