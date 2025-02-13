@@ -210,7 +210,7 @@ def pltHist(dfin, hist, fName=None,startFrom=0):
 
 
         if fName:
-            plt.savefig(Path.cwd() / 'graphs' / (fName + '.svg'), figsize=(39, 5))
+            plt.savefig(Path.cwd() / 'graphs' / (fName + '.svg'))
     except Exception as e:
         logger.error(f'pltHist error:{str(e)}')
 
