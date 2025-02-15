@@ -119,7 +119,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
     """
 
     if model_name in ['model_debug',None]:
-        model_name = f'qt_v08_{strategy}_{trStrat}_{window_size}_{batch_size}_{tik}_{tFrame}_Agent_{Agent.ver}_Data_{Data.ver}'
+        model_name = f'qt_v09_{strategy}_{trStrat}_{window_size}_{batch_size}_{tik}_{tFrame}_Agent_{Agent.ver}_Data_{Data.ver}'
 
     # Create a logger object.
     logger = logging.getLogger('train')
@@ -173,9 +173,9 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
                 f'to:{val_dataOHLCV.df.iloc[tfCounts if val_dataOHLCV.df.shape[0] > tfCounts else (val_dataOHLCV.df.shape[0] - 1)].name}.')
     assert val_dataOHLCV.df.shape[0] > 800 , f'Shape:{val_dataOHLCV.df.shape} < 800.'
     val_dataOHLCV.next(iloc=800)
-    valBro = qbroker(cash=1000)
+    valBro = qbroker(cash=1000000)
     # valBro.set_cash(1000)
-    valBro.setcommission(commission=0.001)
+    valBro.setcommission(commission=0.0001, name=tik)
     val_dataOHLCV.setBroker(valBro)
     sizer = AllInSizer()
     val_dataOHLCV.setsizer(sizer)
@@ -199,14 +199,16 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
         for i in range(evaluate_only[0],evaluate_only[1]) if len(evaluate_only)>1 else  evaluate_only:
             agent = Agent(None, strategy=strategy, pretrained=True,
                         modelPath=(Path.cwd() /'models').absolute().__str__(),
-                        model_name=f"{model_name}_episode_{i}.keras"
+                        model_name=f"{model_name}_episode_{i}"
                           )
             # Установим window_size из параметров загруженной модели.
             if window_size != agent.state_size:
                 logger.error(f'window size parameter not match to loadad model. Set window size from loaded model!')
                 return (-1)
                 # window_size = agent.state_size
-            val_result, history, maxDrawdownAbs = evaluate_model(agent, val_dataOHLCV, window_size, debug,startFrom=800)
+            val_result, history, maxDrawdownAbs = evaluate_model(agent, val_dataOHLCV, window_size, debug
+                                                                 ,startFrom=800,
+                                                                 logger=logger)
             show_train_result((1,2,3,4), val_result, initial_offset, history=history, df=val_dataOHLCV
                               ,maxDrawdownAbs=maxDrawdownAbs,modelName=model_name+'_'+str(i),
                               )
@@ -220,12 +222,12 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
         agent.save(0)
     for episode in range(1, ep_count + 1):
         train_result = train_model(agent, episode, train_data, ep_count=ep_count,
-            batch_size=batch_size, window_size=window_size,
-            rewardFunc = 'calcRewardLine',
-            trStrat=trStrat,
-            #dataOHLCV = train_dataOHLCV,
-            brokerFee=0.001
-            )
+                                   batch_size=batch_size, window_size=window_size,
+                                   reward_func='calcRewardLine',
+                                   tr_strat=trStrat,
+                                   #dataOHLCV = train_dataOHLCV,
+                                   broker_fee=0.0001
+                                   )
         val_result, history, maxDrawdownAbs = evaluate_model(agent, val_dataOHLCV, window_size, debug,startFrom=800
                                                             #, dataOHLCV=val_dataOHLCV.df
                                                             #, brokerFee=0.001
@@ -241,9 +243,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
 
 
 if __name__ == "__main__":
-    print(Path('.').absolute())
     args = docopt(__doc__)
-    print(args)
 
     train_stock = args["--train-stock"]
     val_stock = args["--val-stock"]
@@ -280,7 +280,7 @@ if __name__ == "__main__":
     from trading_bot.agent import AgentF as Agent
     from trading_bot.methodsCap import train_model, evaluate_model
 
-    switch_k_backend_device()
+    # switch_k_backend_device()
 
 
 

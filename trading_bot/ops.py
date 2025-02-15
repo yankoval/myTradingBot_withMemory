@@ -19,8 +19,11 @@ def calcRewardLineShift05(dealPrice, curPrice):
 
 
 def calcRewardLineSigmoid(dealPrice, curPrice):
+    """ calculate % of deal based on current price and deal price. Depending on short deal type  (deal price negative)
+    or long deal type  (deal price positive)"""
     return expit(
-        (curPrice - dealPrice) / dealPrice if dealPrice >= 0 else (-1 * dealPrice - curPrice) / (-1 * dealPrice))
+        ((curPrice - dealPrice) / dealPrice) if dealPrice >= 0 else ((-1 * dealPrice - curPrice) / (-1 * dealPrice))
+    )
 
 
 def sigmoid(x):
