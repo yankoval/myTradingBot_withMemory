@@ -234,7 +234,7 @@ class Agent:
 
 
 class AgentF(Agent):
-    ver = Agent.ver+'.2'
+    ver = Agent.ver+'-2'
     description = 'Base q-lerning agen and model for fractals seq relu 6 layers. Keras 3 file format'
 
     def _model(self):

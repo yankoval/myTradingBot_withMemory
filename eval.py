@@ -61,7 +61,7 @@ if __name__ == "__main__":
     debug = args["--debug"]
 
     coloredlogs.install(level="DEBUG")
-    switch_k_backend_device()
+    # switch_k_backend_device()
 
     try:
         main(eval_stock, window_size, model_name, debug)

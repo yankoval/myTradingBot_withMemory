@@ -347,7 +347,8 @@ class BrokerBase(with_metaclass(MetaBroker, object)): #with_metaclass(MetaBroker
         for data in datas:
             tik = self.getposition(data)
             price = data.df.Close.iloc[data.iloc]
-            if tik.size<0: res += -tik.size * tik.price -tik.size * (tik.price - price)
+            if tik.size<0:
+                res += -tik.size * tik.price -tik.size * (tik.price - price)
             else: res += tik.size * price
         return res
 
@@ -475,8 +476,9 @@ class qbroker(BrokerBase): #BrokerBase
         '''Sets the cash parameter (alias: ``setcash``)'''
         self.startingcash = self.cash = cash
         self._value = cash
-    # Проверяет достаточность средств, возвращает количество наличных остающихся после сделки. Если их >=0 то ОК
+
     def kKontrol(self,size,price,data=None):
+        """Проверяет достаточность средств, возвращает количество наличных остающихся после сделки. Если их >=0 то ОК"""
         data = data if data else self.data
         pos = self.getposition(data)
         need_many_to_do =abs(pos.size + size) * price
@@ -489,7 +491,7 @@ class qbroker(BrokerBase): #BrokerBase
         data = data if data else self.data
         size = size if size is not None else data._sizer.getsizing(data, isbuy=True)
         if plimit == 'Close':
-            price = data.df.iloc[data.iloc-1].Close
+            price = data.df.iloc[data.iloc].Close
         else:
             raise NotImplementedError
         pos = self.getposition(data)
@@ -509,7 +511,7 @@ class qbroker(BrokerBase): #BrokerBase
         data = data if data else self.data
         size = size if size is not None else data._sizer.getsizing(data, isbuy=False)
         if plimit == 'Close':
-            price = data.df.iloc[data.iloc-1].Close
+            price = data.df.iloc[data.iloc].Close
         else:
             raise NotImplementedError
         pos = self.getposition(data)
