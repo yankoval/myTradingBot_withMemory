@@ -79,7 +79,7 @@ class Agent:
         self.optimizer = Adam(learning_rate=self.learning_rate)
 
         if pretrained:
-            self.model = self.load()
+            self.model = self._load()
             config = self.model.get_config()  # Returns pretty much every information about your model
             try:
                 self.state_size = config["layers"][0]["config"]["batch_input_shape"][1]
@@ -223,9 +223,10 @@ class Agent:
             model_name = os.path.join(self.modelPath,f"{self.model_name}.keras")
         self.model.save(model_name)
 
-    def load(self,model_name=None):
+    def _load(self, model_name=None):
         """Load saved model, model_name is filename with extension:str"""
-        model_name = model_name if model_name else f"{self.model_name}.keras"
+        model_name = model_name if model_name else self.model_name
+        model_name = model_name if model_name[-6:] == '.keras' else model_name + '.keras'
         try:
             return load_model(os.path.join(self.modelPath, model_name) , custom_objects=self.custom_objects)
         except:
