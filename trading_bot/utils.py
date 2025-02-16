@@ -1,6 +1,7 @@
 import os
 import math
 import logging
+import traceback
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -178,7 +179,7 @@ def pltHist(dfin, hist, fName=None, startFrom=0):
     logger.debug(f'plt begining...')
     try:
         fig, (ax0, ax1, axmdd, axProb, axCash, axValue, ax2) = plt.subplots(7, 1, sharex=True, gridspec_kw={
-            'height_ratios': [1, 1, 1, 3, 1, 1, 6]}
+            'height_ratios': [3, 3, 3, 3, 3, 1, 6]}
                                                                             , figsize=(df.shape[0] // 15, 12))
         logger.debug('plt started plt.subplots')
         ax0.plot(df.index, df.portfolio)
@@ -194,7 +195,9 @@ def pltHist(dfin, hist, fName=None, startFrom=0):
             axProb.plot(df.index, df[i], label=f'{i}')
         axProb.legend()
         axCash.plot(df.index, df.cash)
+        axCash.text(0.01, 0.9, 'Cash', transform=axCash.transAxes)
         axValue.plot(df.index, df.value)
+        axValue.text(0.01, 0.9, 'Value', transform=axValue.transAxes)
         ax2.plot(df.index, df.High, 'g')
         ax2.plot(df.index, df.Low, 'y')
         ax2.scatter(df.iloc[list(map(lambda x: x - shift, b[0]))].index, b[1], marker='^', s=200, color='green',
@@ -237,7 +240,7 @@ def show_train_result(result, val_position, initial_offset, history=None, df=pd.
     data = df
     df = data.df
 
-    b = [[], []]
+    b,s = [[], []],[[], []]
     if history:
         # print(filter(lambda l: l[2]!='HOLD',history))
         pltHist(df, history, f'{modelName if modelName else "Graph"}_{result[0]:03d}', startFrom=startFrom)
@@ -254,11 +257,14 @@ def show_train_result(result, val_position, initial_offset, history=None, df=pd.
         lText = lText + f' last BUY:{b[1][-1]} last close: {df.iloc[-1].Close}, BUY qty: {len(b[0])} ' \
                         f'SELL qty:{len(s[0])} positionL {len(b[0]) - len(s[0])}'
         lText = lText + f' Train Loss: {result[3]:.4f} , buy deals qty: {len(b[0]) if b else 0}.'
-    except:
-        pass
-    logger.info(lText)
-    logger.debug(f'Buy history:{b}')
-    logger.debug(f'Sell history:{s}')
+        logger.info(lText)
+        logger.debug(f'Buy history:{b}')
+        logger.debug(f'Sell history:{s}')
+    except Exception as e:
+        logger.error(f'show_train_result error:{str(e)}, {traceback.format_exc()}')
+
+
+
 
 
 def show_eval_result(model_name, profit, initial_offset, hist=[]):

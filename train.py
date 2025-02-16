@@ -63,6 +63,7 @@ Broker fee (Finam)
 """
 import logging
 import coloredlogs
+import traceback
 
 from docopt import docopt
 
@@ -78,7 +79,7 @@ from trading_bot.utils import (
     prepareData,
     prepMa,prepAtr,prepFractals
 )
-from trading_bot.utils import Data3 as Data
+from trading_bot.utils import Data3_1 as Data
 from qbroker.broker import qbroker, AllInSizer
 # from scipy.special import expit
 from trading_bot.ops import OHLCVtoSeries,fractalsExp,get_state3
@@ -197,22 +198,26 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
     # Evaluate models
     if evaluate_only:
         for i in range(evaluate_only[0],evaluate_only[1]) if len(evaluate_only)>1 else  evaluate_only:
-            agent = Agent(None, strategy=strategy, pretrained=True,
-                        modelPath=(Path.cwd() /'models').absolute().__str__(),
-                        model_name=f"{model_name}_episode_{i}"
-                          )
-            # Установим window_size из параметров загруженной модели.
-            if window_size != agent.state_size:
-                logger.error(f'window size parameter not match to loadad model. Set window size from loaded model!')
-                return (-1)
-                # window_size = agent.state_size
-            val_result, history, maxDrawdownAbs = evaluate_model(agent, val_dataOHLCV, window_size, debug
-                                                                 ,startFrom=800,
-                                                                 logger=logger)
-            show_train_result((1,2,3,4), val_result, initial_offset, history=history, df=val_dataOHLCV
-                              ,maxDrawdownAbs=maxDrawdownAbs,modelName=model_name+'_'+str(i),
+            try:
+                agent = Agent(None, strategy=strategy, pretrained=True,
+                            modelPath=(Path.cwd() /'models').absolute().__str__(),
+                            model_name=f"{model_name}_episode_{i}"
                               )
-            logger.info(f'Option evaluate_only is: {i}.')
+                # Установим window_size из параметров загруженной модели.
+                if window_size != agent.state_size:
+                    logger.error(f'window size parameter not match to loadad model. Set window size from loaded model!')
+                    return (-1)
+                    # window_size = agent.state_size
+                val_result, history, maxDrawdownAbs = evaluate_model(agent, val_dataOHLCV, window_size, debug
+                                                                     ,startFrom=800,
+                                                                     logger=logger)
+                show_train_result((1,2,3,4), val_result, initial_offset, history=history, df=val_dataOHLCV
+                                  ,maxDrawdownAbs=maxDrawdownAbs,modelName=model_name+'_'+str(i),
+                                  )
+                logger.info(f'Option evaluate_only is: {i}.')
+            except Exception as e:
+                logger.error(f'evaluate_only: on{i} step generate error: {e}. {traceback.format_exc()}')
+                traceback.print_exc()
         return
 
 
@@ -228,18 +233,23 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
                                    #dataOHLCV = train_dataOHLCV,
                                    broker_fee=0.0001
                                    )
-        val_result, history, maxDrawdownAbs = evaluate_model(agent, val_dataOHLCV, window_size, debug,startFrom=800
-                                                            #, dataOHLCV=val_dataOHLCV.df
-                                                            #, brokerFee=0.001
-                                                             )
         try:
+            val_result, history, maxDrawdownAbs = evaluate_model(agent, val_dataOHLCV, window_size
+                                                                 ,debug
+                                                                 ,startFrom=800
+                                                                 ,logger=logger
+                                                                #, dataOHLCV=val_dataOHLCV.df
+                                                                #, brokerFee=0.001
+                                                                 )
             with open(f'{(log_dir / (model_name + (f"_episode_{ep_count}" )))}.hist','w') as f:
                 for h in history:
                     f.write(str(h))
+            show_train_result(train_result, val_result, initial_offset, history=history, df=val_dataOHLCV
+                              , modelName=model_name, maxDrawdownAbs=maxDrawdownAbs)
         except Exception as e:
-            logger.error(f'Error writing history log file: {e}')
-        show_train_result(train_result, val_result, initial_offset, history=history, df=val_dataOHLCV
-                          , modelName=model_name, maxDrawdownAbs=maxDrawdownAbs)
+            logger.error(f'evaluate_model: {e}')
+            traceback.print_exc()
+
 
 
 if __name__ == "__main__":
