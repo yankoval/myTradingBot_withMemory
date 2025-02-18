@@ -12,6 +12,9 @@ from .ops import (
 )
 
 
+import logging
+logger = logging.getLogger(__name__)
+
 # TODO: Create universal broker object to do standard Buy Sell SL TP Profit calc
 # TODO: Create and test model based on standard actions: "Enter with SL" and "Wait" to speed up training
 # TODO: Create and test strategy besed on data optimased by mooving average: abs or % differens to SMA. Goal is to test
@@ -22,8 +25,8 @@ from .ops import (
 
 
 def train_model(agent, episode, data, ep_count=100, batch_size=32, window_size=10, reward_func=None, tr_strat='Long',
-                get_state=get_state3, data_ohlcv_=None, broker_fee=None):
-    # assert trStrat in ['Long']
+                get_state=get_state3, data_ohlcv_=None, broker_fee=None,start_from=0):
+    logger.debug(f'train_model: {locals()}')
     if callable(reward_func):
         reward_func = reward_func
     elif reward_func == 'calcRewardLine':
@@ -35,9 +38,9 @@ def train_model(agent, episode, data, ep_count=100, batch_size=32, window_size=1
 
     agent.inventory = []
     avg_loss = []
-    startFrom = 800
+    startFrom = start_from
 
-    state = data.getState(window_size, agent.inventory, iloc=startFrom)
+    state = data.getState(window_size, agent, iloc=startFrom)
     #get_state(data, startFrom, window_size, memory=agent.inventory, dataOHLCV=dataOHLCV)
 
     # total=data_length,
@@ -55,20 +58,20 @@ def train_model(agent, episode, data, ep_count=100, batch_size=32, window_size=1
         if action == 1:  # and len(agent.inventory) == 0:
             agent.inventory.append(-1 * lastDealPrice)
             # FIXME: Правильно вычислять ревард для всех типов действий: Buy Sell Hold
-            total_profit, profit, pos, reward = data.getProfit(agent.inventory, t)
+            total_profit, profit, pos, reward = data.getProfit(agent, t)
 
         # SELL
         elif action == 2:  # and len(agent.inventory) > 0:
             agent.inventory.append(lastDealPrice)
-            total_profit, profit, pos, reward = data.getProfit(agent.inventory, t)
+            total_profit, profit, pos, reward = data.getProfit(agent, t)
 
         # HOLD
         elif action == 0:  # and len(agent.inventory) > 0:
-            total_profit, profit, pos, reward = data.getProfit(agent.inventory, t)
+            total_profit, profit, pos, reward = data.getProfit(agent, t)
         else:
             raise ValueError(f'Action not in range:{action}')
         done = (t == data_length - 3)
-        next_state = data.getState(window_size, agent.inventory, iloc=t + 1)
+        next_state = data.getState(window_size, agent, iloc=t + 1)
         agent.remember(state, action, reward, next_state, done)
 
         if len(agent.memory) > batch_size:
@@ -80,11 +83,12 @@ def train_model(agent, episode, data, ep_count=100, batch_size=32, window_size=1
 
     if episode % 1 == 0:
         agent.save(episode)
-
+        logger.info(f'Episode {episode} saved')
+    logger.info(f'Total profit: {total_profit}, episode: {episode}')
     return (episode, ep_count, total_profit, np.mean(np.array(avg_loss)))
 
 
-def evaluate_model(agent, data, window_size, debug, startFrom: int = 1, logger=None):
+def evaluate_model(agent, data, window_size, debug, *args, start_from: int = 1,**kwargs):
     assert logger is not None, 'Evaluate logger not set'
     bro = data.broker
     data.df[list(range(agent.action_size))] = np.nan
@@ -105,19 +109,19 @@ def evaluate_model(agent, data, window_size, debug, startFrom: int = 1, logger=N
     history = []
     agent.inventory = []
     # state = get_state(data, startFrom, window_size, agent.inventory, dataOHLCV=dataOHLCV)
-    state = data.getState(window_size, agent.inventory, iloc=startFrom)
+    state = data.getState(window_size, agent, iloc=start_from)
     # state = data.getState()
     brokerFee = data.broker.getcommissioninfo(data)
     brokerFee = brokerFee.p.commission
-    data.iloc = startFrom - 1
-    for t in tqdm(range(startFrom, data_length - 2), leave=True,
-                  desc=f'Evaluate model, episode {startFrom}/{data_length - 2}.'):
+    data.iloc = start_from
+    for t in tqdm(range(start_from, data_length - 2), leave=True,
+                  desc=f'Evaluate model, episode {start_from}/{data_length - 2}.'):
         data.next()
         currentDealPrice = data.df.Close.iloc[data.iloc]
         reward = .5
         pos = bro.getposition()
         try:
-            next_state = data.getState(window_size, agent.inventory, iloc=data.iloc + 1)
+            next_state = data.getState(window_size, agent, iloc=data.iloc + 1)
         except:
             raise
         # FIXME: Провериь логику получения состояния evaluate_model, в нем не учитывается действия текущего шага!
@@ -132,7 +136,7 @@ def evaluate_model(agent, data, window_size, debug, startFrom: int = 1, logger=N
             if res:
                 agent.inventory.append(-1 * currentDealPrice)
                 # FIXME: Правильно вычислять ревард для всех типов действий: Buy Sell Hold
-                total_profit_, profit, pos, reward = data.getProfit(agent.inventory, t)
+                total_profit_, profit, pos, reward = data.getProfit(agent, t)
                 # total_profit += -currentDealPrice * brokerFee if brokerFee else 0
                 total_profit = bro.get_cash() + bro.getvalue(data) - bro.startingcash
                 # agent.inventory.append(currentDealPrice)
@@ -150,7 +154,7 @@ def evaluate_model(agent, data, window_size, debug, startFrom: int = 1, logger=N
                 # bought_price = agent.inventory.pop(0)
                 bought_price = pos.price
                 agent.inventory.append(currentDealPrice)
-                total_profit_, profit, pos, reward = data.getProfit(agent.inventory, t)
+                total_profit_, profit, pos, reward = data.getProfit(agent, t)
                 total_profit = bro.get_cash() + bro.getvalue(data) - bro.startingcash
                 # reward = rewardFunc(pos.size*pos.price, data[0] + total_profit)
                 maxDrawdownAbs = maxDrawdownAbs if total_profit > maxDrawdownAbs else total_profit
@@ -164,7 +168,7 @@ def evaluate_model(agent, data, window_size, debug, startFrom: int = 1, logger=N
         # HOLD
         elif action == 0 and len(agent.inventory) > 0:
             delta = 0
-            total_profit_, profit, pos, reward = data.getProfit(agent.inventory, t)
+            total_profit_, profit, pos, reward = data.getProfit(agent, t)
             logger.info(f'total_profit_:{total_profit_}, profit:{profit}, pos:{pos}, reward:{reward},')
             total_profit = bro.get_cash() + bro.getvalue(data) - bro.startingcash
             # maxDrawdownAbs = maxDrawdownAbs if total_profit+delta > maxDrawdownAbs else total_profit+delta

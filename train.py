@@ -3,17 +3,18 @@ Script for training Stock Trading Bot.
 
 
 Usage:
-  train.py [--train-stock=<train-stock>] [--val-stock=<val-stock>] [--strategy=<strategy>]
+  train.py [--train-stock=<train-stock>] [--val-stock=<val-stock>] [--agentClass=<agentClass>] [--strategy=<strategy>]
     [--window-size=<window-size>] [--batch-size=<batch-size>]
     [--episode-count=<episode-count>] [--model-name=<model-name>]
     [--pretrained] [--debug] [--log_dir=<log_dir>][--tfCounts=<tf-Counts>]  [--tik=<tiker>]
     [--tFrame=<tFrame>] [--dFrom=<dFrom>] [--dTo=<dTo>]
-    [--vdFrom=<vdFrom>] [--vdTo=<vdTo>] [--trStrat=<trStrat>] [--trainId=<trainId>]
-    [--dataPath=<dataPath>] [--evaluate_only=<evaluate_only>]
+    [--vdFrom=<vdFrom>] [--vdTo=<vdTo>] [--start_from=<start_from>] [--trStrat=<trStrat>] [--trainId=<trainId>]
+    [--dataPath=<dataPath>] [--dataClass=<dataClass>] [--evaluate_only=<evaluate_only>]
     
 Options:
   --train-stock=<train-stock>       train data file ( if not set "--tik" used to read finamDB)
   --val-stock=<val-stock>           validate data file ( if not set "--tik" used to read finamDB)
+  --agentClass=<agentClass>           agent Class name, default basic agent for t-dqn [default: Agent]
   --strategy=<strategy>             Q-learning strategy to use for training the network. Options:
                                       `dqn` i.e. Vanilla DQN,
                                       `t-dqn` i.e. DQN with fixed target distribution,
@@ -35,9 +36,11 @@ Options:
   --dTo=<dTo>                       filter to Date default None 
   --vdFrom=<vdFrom>                 validate  filter from Date default None 
   --vdTo=<vdTo>                     validate  filter to Date default None 
+  --start_from=<start_from>         Starting train index  [default: 0]
   --trStrat=<trStrat>               trade strategy long, short or both  [default: long]
   --trainId=<trainId>               randomId of train filename suffix  [default: 0]
   --dataPath=<dataPath>             dataPath to DATASETs DB    [default: data]
+  --dataClass=<dataClass>           data Class name, default basic OHLCV [default: Data]
   --evaluate_only=<evaluate_only>   evaluate pretrained models episodes range. --evaluate_only=1,2 episodes range(1,2)
 
 """
@@ -62,45 +65,37 @@ Broker fee (Finam)
 Не менее 41,3 ₽ за исполненное поручение
 """
 import logging
+import logging.config
 import coloredlogs
 import traceback
 
 from docopt import docopt
 
 from pathlib import Path
-# from trading_bot.agent import Agent,AgentF, switch_k_backend_device
-# from trading_bot.methodsCap import train_model, evaluate_model
-from trading_bot.utils import (
-    get_stock_data,
-    format_currency,
-    format_position,
-    show_train_result,
-    readData,
-    prepareData,
-    prepMa,prepAtr,prepFractals
-)
-from trading_bot.utils import Data3_1 as Data
+from trading_bot.utils import show_train_result
 from qbroker.broker import qbroker, AllInSizer
-# from scipy.special import expit
-from trading_bot.ops import OHLCVtoSeries,fractalsExp,get_state3
-
-import numpy as np
 
 
-def main(train_stock, val_stock, window_size, batch_size, ep_count,
-         strategy="t-dqn", model_name="model_debug", pretrained=False,
-         debug=False, tfCounts = None
+def main(train_stock, val_stock, window_size, batch_size, ep_count
+         ,strategy="t-dqn", model_name="model_debug"
+         ,agentClass = None
+         ,pretrained=False
+         ,dataClass=None
+         ,tfCounts = None
          ,tik=None                     #Tiker from Finam DB if none read from CSV
          ,tFrame='daily'               #Time frame (daily,hourly,minute,monthly,weekly)
          ,dFrom=None                   #train filter from Date default None 
          ,dTo=None                     #train filter to Date default None 
          ,vdFrom=None                   #validate filter from Date default None 
-         ,vdTo=None                     #validate filter to Date default None 
+         ,vdTo=None                     #validate filter to Date default None
+         ,start_from=1
          ,trStrat='long'                 #trade strategy long, short or both [default: long ]
          ,trainId='0'
          ,dataPath=r'D:/share/finam/data/'
          ,evaluate_only=None
          ,log_dir=None
+         ,debug=False
+         ,
          ):
     """ Trains the stock trading bot using Deep Q-Learning.
     Please see https://arxiv.org/abs/1312.5602 for more details.
@@ -118,13 +113,19 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
     qt_v08 - based on qt_v07, Model with 6 layers
 
     """
+    # Create a logger object.
+    logging.config.fileConfig(r'logging.conf', disable_existing_loggers=False)
+    logger = logging.getLogger(__name__)
+
+    # import dynamic classes
+    import importlib
+    Data = importlib.import_module('trading_bot.utils').__dict__[dataClass]
+    Agent = importlib.import_module('trading_bot.agent').__dict__[agentClass]
 
     if model_name in ['model_debug',None]:
         model_name = f'qt_v09_{strategy}_{trStrat}_{window_size}_{batch_size}_{tik}_{tFrame}_Agent_{Agent.ver}_Data_{Data.ver}'
 
-    # Create a logger object.
-    logger = logging.getLogger('train')
-    coloredlogs.install(level=logging.DEBUG if debug else logging.INFO, fmt=f'%(asctime)s,%(name)s,%(levelname)s,{model_name}: %(message)s', logger=logger)
+    coloredlogs.install(fmt=f'%(asctime)s,%(name)s,%(levelname)s,{model_name}: %(message)s', logger=logger)
 
     log_dir = Path('.')/'logs' if log_dir is None else Path(log_dir)
     if not log_dir.exists():
@@ -133,47 +134,37 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
     # Create a file handler object
     fh = logging.FileHandler(f'{(log_dir / (model_name+("_eval"if evaluate_only else "")))}.log')
     fh.setLevel(logging.DEBUG if debug else logging.INFO)
-
     # Create a ColoredFormatter to use as formatter for the FileHandler
-    formatter = coloredlogs.ColoredFormatter(f'%(asctime)s,{model_name}_{trainId}: %(message)s')
+    formatter = coloredlogs.ColoredFormatter(f'%(asctime)s,%(levelname)s,{model_name}_{trainId}: %(message)s')
     fh.setFormatter(formatter)
     logger.addHandler(fh)
 
+    # filter log modules
+    logger_urllib3 = logging.getLogger('urllib3')
+    logger_urllib3.setLevel(logging.ERROR)
 
     logger.info(f'log_dir: {log_dir}')
     logger.info(f'model_name: {model_name}')
-    logger.info(f'dataPath: {dataPath}')
-    
+    logger.info(f'dataPath: {dataPath}, dataClass: {dataClass}')
+
+
     if not evaluate_only:
-        # if pretrained:
-        #     if not Path('models/' + model_name).is_dir():
-        #         raise RuntimeError(f'There is no models at {Path("models/" + model_name).absolute()}.')
-        # agent = AgentF(window_size, strategy=strategy, pretrained=pretrained, model_name=model_name)
-        # train_dataOHLCV = readData(train_stock,dataPath, tfCounts=tfCounts, tik=tik, tFrame=tFrame, dFrom=dFrom, dTo=dTo)
-        # if train_dataOHLCV.empty:
-        #     logger.error('Train dataset is empty.')
-        #     return (-1)
-        # logger.info(f'train data shape:{train_dataOHLCV.shape}, tfCounts: {tfCounts}, from:{train_dataOHLCV.iloc[0].name} '
-        #             f'to:{train_dataOHLCV.iloc[tfCounts if train_dataOHLCV.shape[0]>tfCounts else (train_dataOHLCV.shape[0]-1)].name}.')
-        # train_data = prepareData(train_dataOHLCV)
-        # logger.info(f'Prepared train ver:0.1 data shape:{len(train_data)}')
         train_data = Data(train_stock if train_stock else dataPath, tfCounts=tfCounts, tik=tik, tFrame=tFrame,
                               dFrom=dFrom,
                               dTo=dTo,
-                          window_size=window_size,)
+                          window_size=window_size,start_from=start_from)
         if not train_data:
             logger.error('Train dataset is empty after preparation.')
             return (-1)
         logger.info(
-            f'Train data shape:{train_data.df.shape}, tfCounts: {tfCounts}, from:{train_data.df.iloc[0].name} '
-            f'to:{train_data.df.iloc[tfCounts if train_data.df.shape[0] > tfCounts else (train_data.df.shape[0] - 1)].name}.')
+            f'Train data shape:{train_data.df.shape}, from:{train_data.df.iloc[0].name}, to:{train_data.df.index[-1]}.')
     # val_dataOHLCV = readData(val_stock, dataPath, tfCounts=tfCounts, tik=tik, tFrame=tFrame, dFrom=vdFrom, dTo=vdTo)
     val_dataOHLCV = Data(val_stock if val_stock else dataPath, tfCounts=tfCounts, tik=tik, tFrame=tFrame, dFrom=vdFrom,
-               dTo=vdTo,window_size=window_size,)
-    logger.info(f'Validation data data shape:{val_dataOHLCV.df.shape}, tfCounts: {tfCounts}, from:{val_dataOHLCV.df.iloc[0].name} '
-                f'to:{val_dataOHLCV.df.iloc[tfCounts if val_dataOHLCV.df.shape[0] > tfCounts else (val_dataOHLCV.df.shape[0] - 1)].name}.')
+               dTo=vdTo,window_size=window_size,start_from=start_from,)
+    logger.info(f'Validation data data shape:{val_dataOHLCV.df.shape}, tfCounts: {tfCounts}, from:{val_dataOHLCV.df.index[0]} '
+                f'to:{val_dataOHLCV.df.index[-1]}.')
     assert val_dataOHLCV.df.shape[0] > 800 , f'Shape:{val_dataOHLCV.df.shape} < 800.'
-    val_dataOHLCV.next(iloc=800)
+    val_dataOHLCV.next(iloc=start_from)
     valBro = qbroker(cash=1000000)
     # valBro.set_cash(1000)
     valBro.setcommission(commission=0.0001, name=tik)
@@ -183,16 +174,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
     if val_dataOHLCV.df.empty:
         logger.error('Validate dataset is empty.') #8988 623 30 01 марг мих 370
         return (-1)
-    #val_data = prepareData(val_dataOHLCV.df)
-    # if not val_data:
-    #     logger.error('Validate dataset is empty after preparation.')
-    #     return (-1)
 
-    logger.info(f'val data shape:{val_dataOHLCV.df.shape}, tfCounts: {tfCounts}, from:{val_dataOHLCV.df.iloc[0].name},'
-                f'to:{val_dataOHLCV.df.iloc[tfCounts if val_dataOHLCV.df.shape[0]>tfCounts else (val_dataOHLCV.df.shape[0]-1)].name}.')
-    if val_dataOHLCV.df.shape[0] <= 800 - 2:
-        logger.error(f'Val shape:{val_dataOHLCV.df.shape[0]} less then {800 - 2}')
-        raise
     initial_offset = 0.05
 
     # Evaluate models
@@ -209,10 +191,10 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
                     return (-1)
                     # window_size = agent.state_size
                 val_result, history, maxDrawdownAbs = evaluate_model(agent, val_dataOHLCV, window_size, debug
-                                                                     ,startFrom=800,
+                                                                     ,start_from=start_from,
                                                                      logger=logger)
-                show_train_result((1,2,3,4), val_result, initial_offset, history=history, df=val_dataOHLCV
-                                  ,maxDrawdownAbs=maxDrawdownAbs,modelName=model_name+'_'+str(i),
+                show_train_result((1,2,3,4), val_result, initial_offset, history=history, data=val_dataOHLCV
+                                  ,maxDrawdownAbs=maxDrawdownAbs,modelName=model_name+'_'+str(i), start_from=start_from
                                   )
                 logger.info(f'Option evaluate_only is: {i}.')
             except Exception as e:
@@ -230,25 +212,24 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count,
                                    batch_size=batch_size, window_size=window_size,
                                    reward_func='calcRewardLine',
                                    tr_strat=trStrat,
-                                   #dataOHLCV = train_dataOHLCV,
+                                   start_from=start_from,
                                    broker_fee=0.0001
                                    )
         try:
             val_result, history, maxDrawdownAbs = evaluate_model(agent, val_dataOHLCV, window_size
-                                                                 ,debug
-                                                                 ,startFrom=800
-                                                                 ,logger=logger
-                                                                #, dataOHLCV=val_dataOHLCV.df
-                                                                #, brokerFee=0.001
+                                                                 , debug
+                                                                 , logger=logger
+                                                                 , start_from=start_from
+                                                                 #, brokerFee=0.001
                                                                  )
             with open(f'{(log_dir / (model_name + (f"_episode_{ep_count}" )))}.hist','w') as f:
                 for h in history:
                     f.write(str(h))
-            show_train_result(train_result, val_result, initial_offset, history=history, df=val_dataOHLCV
-                              , modelName=model_name, maxDrawdownAbs=maxDrawdownAbs)
+            show_train_result(train_result, val_result, initial_offset, history=history, data=val_dataOHLCV
+                              , modelName=model_name, maxDrawdownAbs=maxDrawdownAbs, start_from=start_from)
         except Exception as e:
-            logger.error(f'evaluate_model: {e}')
-            traceback.print_exc()
+            logger.error(f'evaluate_model: {e}, {traceback.format_exc()}')
+            # print(traceback.print_exc())
 
 
 
@@ -271,11 +252,14 @@ if __name__ == "__main__":
     dTo = args["--dTo"]
     vdFrom = args["--vdFrom"]
     vdTo = args["--vdTo"]
+    start_from = int(args["--start_from"])
     trStrat = args["--trStrat"]
     trainId = args["--trainId"]
     dataPath = args["--dataPath"]
     evaluate_only=list(map(int,args["--evaluate_only"].split(','))) if isinstance(args["--evaluate_only"],str) else args["--evaluate_only"]
     log_dir = args["--log_dir"]
+    dataClass = args["--dataClass"]
+    agentClass = args["--agentClass"]
     # Parameters checks
 
     # Check path to data:
@@ -287,7 +271,7 @@ if __name__ == "__main__":
         raise RuntimeError(f'There is no data dir at {Path(dataPath).absolute()}.')
 
     from trading_bot.agent import switch_k_backend_device
-    from trading_bot.agent import AgentF as Agent
+    # from trading_bot.agent import AgentF as Agent
     from trading_bot.methodsCap import train_model, evaluate_model
 
     # switch_k_backend_device()
@@ -297,10 +281,12 @@ if __name__ == "__main__":
 
     try:
         main(train_stock, val_stock, window_size, batch_size,
-             ep_count, strategy=strategy, model_name=model_name, 
-             pretrained=pretrained, debug=debug,tfCounts=tfCounts,
+             ep_count, strategy=strategy, model_name=model_name
+             ,agentClass=agentClass
+             ,pretrained=pretrained, debug=debug,tfCounts=tfCounts,
              tik=tik,tFrame=tFrame,dFrom=dFrom,dTo=dTo,vdFrom=vdFrom,
              vdTo=vdTo,trStrat=trStrat, trainId=trainId, dataPath=dataPath
-             ,evaluate_only=evaluate_only,log_dir=log_dir)
+             ,evaluate_only=evaluate_only,log_dir=log_dir, start_from=start_from
+             ,dataClass=dataClass)
     except KeyboardInterrupt:
         print("Aborted!")

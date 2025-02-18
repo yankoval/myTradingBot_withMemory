@@ -11,7 +11,7 @@ import tensorflow.keras.backend as K
 
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.models import load_model, clone_model
-from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dense, LSTM
 #from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.optimizers import Adam
 
@@ -69,10 +69,10 @@ class Agent:
 
         # model config
         self.model_name = model_name
-        self.gamma = 0.95 # affinity for long term reward
+        self.gamma = 0.98 # affinity for long term reward
         self.epsilon = 0.99
         self.epsilon_min = 0.1
-        self.epsilon_decay = 0.999
+        self.epsilon_decay = 0.99999
         self.learning_rate = 0.0005
         self.loss = huber_loss
         self.custom_objects = {"huber_loss": huber_loss}  # important for loading the model from memory
@@ -251,5 +251,4 @@ class AgentF(Agent):
 
         model.compile(loss=self.loss, optimizer=self.optimizer)
         return model
-    
     
