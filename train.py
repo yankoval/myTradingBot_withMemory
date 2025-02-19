@@ -114,7 +114,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
 
     """
     # Create a logger object.
-    logging.config.fileConfig(r'logging.conf', disable_existing_loggers=False)
+    logging.config.fileConfig(Path('logging.conf').absolute(), disable_existing_loggers=False)
     logger = logging.getLogger(__name__)
 
     # import dynamic classes
