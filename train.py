@@ -139,8 +139,10 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
     fh.setFormatter(formatter)
     logger.addHandler(fh)
 
-    # filter log modules
+    # filter log modules matplotlib.category
     logger_urllib3 = logging.getLogger('urllib3')
+    logger_urllib3.setLevel(logging.ERROR)
+    logger_urllib3 = logging.getLogger('matplotlib.category')
     logger_urllib3.setLevel(logging.ERROR)
 
     logger.info(f'log_dir: {log_dir}')

@@ -1,6 +1,4 @@
 import os
-import math
-import logging
 import traceback
 from pathlib import Path
 import pandas as pd
@@ -20,22 +18,26 @@ format_position = lambda price: ('$' if price < 0 else '$') + '{0:.2f}'.format(p
 # Formats Currency
 format_currency = lambda price: '${0:.2f}'.format(abs(price))
 
-logger = logging.getLogger('train')
-logger.setLevel(logging.DEBUG)  # You can adjust the level as needed
+import logging
+logger = logging.getLogger(__name__)
 
-# Create a console handler and set its level to DEBUG
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
-# Create a formatter and add it to the handler
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-console_handler.setFormatter(formatter)
 
-# Add the console handler to the logger
-logger.addHandler(console_handler)
-logger.debug('test')
-
-plt.set_loglevel('ERROR')
-logger.debug('test')
+# logger = logging.getLogger('train')
+# logger.setLevel(logging.DEBUG)  # You can adjust the level as needed
+#
+# # Create a console handler and set its level to DEBUG
+# console_handler = logging.StreamHandler()
+# console_handler.setLevel(logging.DEBUG)
+# # Create a formatter and add it to the handler
+# formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# console_handler.setFormatter(formatter)
+#
+# # Add the console handler to the logger
+# logger.addHandler(console_handler)
+# logger.debug('test')
+#
+# plt.set_loglevel('ERROR')
+# logger.debug('test')
 
 
 def calculateFractalsPairs(df, CalculateValues=True, CalculateTimeDiff=True):
@@ -52,8 +54,8 @@ def calculateFractalsPairs(df, CalculateValues=True, CalculateTimeDiff=True):
         (df['Low'] < df['Low'].shift(1)) &
         (df['Low'] <= df['Low'].shift(-1)) &
         (df['Low'] < df['Low'].shift(2)) &
-        (df['Low'] <= df['Low'].shift(-2))
-        , np.True_, np.False_
+        (df['Low'] <= df['Low'].shift(-2)),
+        np.True_, np.False_
     )
     # Calculate High fractal coresponded all Low froctals
     df['fHigh'] = np.where(df.fLow, df.index.to_series().values.astype("float64"), np.nan)
@@ -110,21 +112,30 @@ def calcLevels(df, kMeansKwargs={"init": "k-means++", "n_init": 4, "n_clusters":
     return levels
 
 
-def calcLevelsForEachInterval(df: pd.DataFrame, freq: str = 'D'):
-    """ calculate df with sets of levels for each time step by tDiff as index"""
+def calcLevelsForEachInterval(df: pd.DataFrame, duration: str = '30D',freq='D'):
+    """ calculate df with sets of levels for each time step by tDiff as index
+    duration:str , pandas Timedelta()  ISO 8601 Duration arg alias like '1D', '3H', '90min'
+    freq: str - index step, pandas freq alias as 'D', 'H', 'min' """
     # Generate day range index
-    idx = pd.date_range(start=df.index.min(), end=df.index.max(), freq=freq, normalize=True)
+    idx = pd.date_range(start=df.index.min() + pd.Timedelta(duration), end=df.index.max(), freq=freq, normalize=True)
+    assert idx.shape[0], (f'calcLevelsForEachInterval range is empty duration:"{duration}", '
+                          f'from {df.index.min() + pd.Timedelta(duration)} to {df.index.max()}')
     # generate levels for each
-    levels = [calcLevels(df.loc[:day + pd.Timedelta('1' + freq)]) for day in idx]
+    levels = [calcLevels(df.loc[day - pd.Timedelta(duration):day]) for day in idx]
     # correct time shift to prevent future vision
-    levels = [levels[0]] + levels[:-1]
+    # levels = [levels[0]] + levels[:-1]
     return pd.DataFrame(levels, index=idx)
 
 
-def pltHist(dfin, hist, fName=None, startFrom=0):
+def pltHist(dfin, hist, fName=None, start_from=0):
+    """ Displays training results.
+    hist: dict returned by evaluate_model
+    dfin: Data obj
+    startFrom: index to start plotting
+    """
     logger.debug(f'pltHist started.')
-    shift = startFrom  #hist[0][0] if hist else 0
-    df = dfin  #.copy()
+    shift = start_from  #hist[0][0] if hist else 0
+    df = dfin  if type(dfin) is pd.DataFrame else dfin.df
     df = df.iloc[shift:]
     b = [[r[0] for r in hist if r[2] == 'BUY'], [r[1] for r in hist if r[2] == 'BUY']]
     print(b)
@@ -137,7 +148,7 @@ def pltHist(dfin, hist, fName=None, startFrom=0):
     df = df.assign(portfolio=np.nan)
     df = df.assign(maxDD=np.nan)
     profit = 0
-    curPosQty, dealQty, curPos, maxDD = 0, 10, 0, 0
+    curPosQty, dealQty, curPos, maxDD = 0, 1, 0, 0
     curCash = df.iloc[0].Close * dealQty
     privStep = 0
     for i, step in enumerate(hist):
@@ -150,9 +161,9 @@ def pltHist(dfin, hist, fName=None, startFrom=0):
             curPos += df.iloc[step[0] - shift].Close * dealQty
             curPosQty += dealQty
         if step[2] == 'SELL':
-            curCash += df.iloc[step[0] - shift].Close * curPosQty
-            curPos = 0
-            curPosQty = 0
+            curCash += df.iloc[step[0] - shift].Close * dealQty
+            curPos -= df.iloc[step[0] - shift].Close * dealQty
+            curPosQty -= dealQty
         if step[2] == 'HOLD':
             curPos = df.iloc[step[0] - shift].Close * curPosQty
         privStep = step[0] - shift
@@ -166,84 +177,109 @@ def pltHist(dfin, hist, fName=None, startFrom=0):
 
     df.index = df.index.map(str)
 
-    # Major ticks every 20, minor ticks every 5
-    major_ticks = np.arange(shift, df.shape[0], df.shape[0] / 5)
-    major_ticks = df.iloc[major_ticks].index
-    minor_ticks = np.arange(shift, df.shape[0], df.shape[0] / 10)
-    minor_ticks = df.iloc[minor_ticks].index
 
-    dRange = df.High.max() - df.Low.min()
-    major_ticks_y = np.arange(df.Low.min(), df.High.max(), dRange / 6)
-    minor_ticks_y = np.arange(df.Low.min(), df.High.max(), dRange / 12)
 
     logger.debug(f'plt begining...')
-    try:
-        fig, (ax0, ax1, axmdd, axProb, axCash, axValue, ax2) = plt.subplots(7, 1, sharex=True, gridspec_kw={
-            'height_ratios': [3, 3, 3, 3, 3, 1, 6]}
-                                                                            , figsize=(df.shape[0] // 15, 12))
-        logger.debug('plt started plt.subplots')
-        ax0.plot(df.index, df.portfolio)
-        plt.setp(ax0.get_xticklabels(), visible=False)
-        ax0.grid(which='both')
-        ax1.plot(df.index, df.curPosQty)
-        # make these tick labels invisible
-        plt.setp(ax1.get_xticklabels(), visible=False)
-        axmdd.plot(df.index, df.maxDD)
-        # make these tick labels invisible
-        plt.setp(axmdd.get_xticklabels(), visible=False)
-        for i in range(3):
-            axProb.plot(df.index, df[i], label=f'{i}')
-        axProb.legend()
-        axCash.plot(df.index, df.cash)
-        axCash.text(0.01, 0.9, 'Cash', transform=axCash.transAxes)
-        axValue.plot(df.index, df.value)
-        axValue.text(0.01, 0.9, 'Value', transform=axValue.transAxes)
-        ax2.plot(df.index, df.High, 'g')
-        ax2.plot(df.index, df.Low, 'y')
-        ax2.scatter(df.iloc[list(map(lambda x: x - shift, b[0]))].index, b[1], marker='^', s=200, color='green',
-                    alpha=0.5)
-        ax2.scatter(df.iloc[list(map(lambda x: x - shift, s[0]))].index, s[1], marker='v', s=200, color='red',
-                    alpha=0.3)
+    for slot in range(df.shape[0]//1000):
+        day_df = df.iloc[slot * 1000 : (slot+1) * 1000]
+        # Major ticks every 20, minor ticks every 5
+        major_ticks = np.arange(0, day_df.shape[0], day_df.shape[0] / 5)
+        major_ticks = day_df.iloc[major_ticks].index
+        minor_ticks = np.arange(0, day_df.shape[0], day_df.shape[0] / 10)
+        minor_ticks = day_df.iloc[minor_ticks].index
 
-        ax2.set_xticks(major_ticks)
-        ax2.set_xticks(minor_ticks, minor=True)
-        ax2.set_yticks(major_ticks_y)
-        ax2.set_yticks(minor_ticks_y, minor=True)
+        dRange = day_df.High.max() - day_df.Low.min()
+        major_ticks_y = np.arange(day_df.Low.min(), day_df.High.max(), dRange / 6)
+        minor_ticks_y = np.arange(day_df.Low.min(), day_df.High.max(), dRange / 12)
+        try:
+            fig, (ax0, ax1, axmdd, axProb, axCash, axValue, ax2) = plt.subplots(7, 1, sharex=True, gridspec_kw={
+                'height_ratios': [3, 3, 3, 3, 3, 1, 6]}
+                                                                                , figsize=(day_df.shape[0] // 15, 12))
+            logger.debug('plt started plt.subplots')
+            ax0.plot(day_df.index, day_df.portfolio)
+            plt.setp(ax0.get_xticklabels(), visible=False)
+            ax0.grid(which='both')
+            ax1.plot(day_df.index, day_df.curPosQty)
+            # make these tick labels invisible
+            plt.setp(ax1.get_xticklabels(), visible=False)
+            axmdd.plot(day_df.index, day_df.maxDD)
+            # make these tick labels invisible
+            plt.setp(axmdd.get_xticklabels(), visible=False)
+            for i in range(3):
+                axProb.plot(day_df.index, day_df[i], label=f'{i}')
+            axProb.legend()
+            axCash.plot(day_df.index, day_df.cash)
+            axCash.text(0.01, 0.9, 'Cash', transform=axCash.transAxes)
+            axValue.plot(day_df.index, day_df.value)
+            axValue.text(0.01, 0.9, 'Value', transform=axValue.transAxes)
+            ax2.plot(day_df.index, day_df.High, 'g')
+            ax2.plot(day_df.index, day_df.Low, 'y')
+            ax2.scatter(pd.DataFrame(np.array(b).transpose()).loc[
+                            ((np.array(b)[0] - shift > slot * 1000) & ((slot + 1) * 1000 > np.array(b)[0] - shift)), [
+                                0]] - shift - slot * 1000, pd.DataFrame(np.array(b).transpose()).loc[
+                            ((np.array(b)[0] - shift > slot * 1000) & ((slot + 1) * 1000 > np.array(b)[0] - shift)), [
+                                1]], marker='^', s=200, color='green',
+                        alpha=0.5)
+            # ax2.scatter(day_df.iloc[list(map(lambda x: x - shift, b[0]))].index, b[1], marker='^', s=200, color='green',
+            #             alpha=0.5)
+            ax2.scatter(pd.DataFrame(np.array(s).transpose()).loc[
+                            ((np.array(s)[0] - shift > slot * 1000) & ((slot + 1) * 1000 > np.array(s)[0] - shift)), [
+                                0]] - shift - slot * 1000, pd.DataFrame(np.array(s).transpose()).loc[
+                            ((np.array(s)[0] - shift > slot * 1000) & ((slot + 1) * 1000 > np.array(s)[0] - shift)), [
+                                1]], marker='v', s=200, color='red',alpha=0.3)
 
-        # And a corresponding grid
-        ax2.grid(which='both')
+            # ax2.scatter(day_df.iloc[list(map(lambda x: x - shift, s[0]))].index, s[1], marker='v', s=200, color='red',
+            #             alpha=0.3)
+            # plot levels if calculted
+            if 'nLevel' in day_df.columns:
+                ax2.plot(day_df.nLevel,color='red',label='nearest level')
+            ax2.set_xticks(major_ticks)
+            ax2.set_xticks(minor_ticks, minor=True)
+            ax2.set_yticks(major_ticks_y)
+            ax2.set_yticks(minor_ticks_y, minor=True)
 
-        # Or if you want different settings for the grids:
-        ax2.text(0.01, 0.9, fName, transform=ax2.transAxes)  # ,df.High.max()-dRange/10
-        ax0.text(0.01, 0.9,
-                 f'portfolio, max:{df.portfolio.max():0.2f}, '
-                 f'start:{df.Close.iloc[startFrom] * dealQty:0.2f}'
-                 f', end:{df.portfolio.iloc[-1]:0.2f}, '
-                 f'%{(df.portfolio.iloc[-1] - df.portfolio.iloc[0]) / (df.portfolio.iloc[0]):0.2f}'
-                 , transform=ax0.transAxes)
-        ax1.text(0.01, 0.9, 'curPosQty', transform=ax1.transAxes)
-        maxDD = df.maxDD.min()
-        axmdd.text(0.01, 0.9, f'Max Drop Down Abs:{maxDD:0.2f}, :{maxDD / df.portfolio.iloc[0]:0.2f}%',
-                   transform=axmdd.transAxes)
+            # And a corresponding grid
+            ax2.grid(which='both')
 
-        if fName:
-            plt.savefig(Path.cwd() / 'graphs' / (fName + '.svg'))
-    except Exception as e:
-        logger.error(f'pltHist error:{str(e)}')
+            # Or if you want different settings for the grids:
+            ax2.text(0.01, 0.9, fName, transform=ax2.transAxes)  # ,day_df.High.max()-dRange/10
+            ax0.text(0.01, 0.9,
+                     f'portfolio, max:{day_df.portfolio.max():0.2f}, '
+                     f'start:{day_df.Close.iloc[10] * dealQty:0.2f}'
+                     f', end:{day_df.portfolio.iloc[-1]:0.2f}, '
+                     f'%{(day_df.portfolio.iloc[-1] - day_df.portfolio.iloc[0]) / (day_df.portfolio.iloc[0]):0.2f}'
+                     , transform=ax0.transAxes)
+            ax1.text(0.01, 0.9, 'curPosQty', transform=ax1.transAxes)
+            maxDD = day_df.maxDD.min()
+            axmdd.text(0.01, 0.9, f'Max Drop Down Abs:{maxDD:0.2f}, :{maxDD / day_df.portfolio.iloc[0]:0.2f}%',
+                       transform=axmdd.transAxes)
+
+            if fName:
+                plt.savefig(Path.cwd() / 'graphs' / (fName+'_slot_' +str(slot)+ '.svg'))
+        except Exception as e:
+            logger.error(f'pltHist error:{str(e)}, {traceback.format_exc()}')
 
 
-def show_train_result(result, val_position, initial_offset, history=None, df=pd.DataFrame(), modelName=None
+def show_train_result(result, val_position, initial_offset, history=None, data=None, modelName=None
                       , maxDrawdownAbs=None
-                      , startFrom: int = 0):
-    """ Displays training results
+                      , start_from: int = 0):
+    """ Displays training results.
+    result : list returned by evaluate_model
+    history: dict returned by evaluate_model
+    data: Data obj
+
     """
-    data = df
-    df = data.df
+    assert data is not None, 'Set up show_train_result params'
+    if type(data) is pd.DataFrame:
+        df = data
+    else:
+        data = data
+        df = data.df
 
     b,s = [[], []],[[], []]
     if history:
         # print(filter(lambda l: l[2]!='HOLD',history))
-        pltHist(df, history, f'{modelName if modelName else "Graph"}_{result[0]:03d}', startFrom=startFrom)
+        pltHist(data, history, f'{modelName if modelName else "Graph"}_{result[0]:03d}', start_from=start_from)
         b = [[r[0] for r in history if r[2] == 'BUY'], [r[1] for r in history if r[2] == 'BUY']]
         s = [[r[0] for r in history if r[2] == 'SELL'], [r[1] for r in history if r[2] == 'SELL']]
     else:
@@ -292,12 +328,16 @@ class Data:
     indexStartPos = 800
     def __init__(self, *args, **kwargs):
         self.tik = self._name = kwargs.get('tik')
-        if args[0] and Path(args[0]).is_file():
-            self.df = readData(args[0], None, *args[1:], **kwargs)
-        elif Path(args[0]).is_dir():
-            self.df = readData(None, args[0], *args[1:], **kwargs)
+        self.start_from = kwargs.get('start_from',Data.indexStartPos)
+        if args:
+            if args[0] and Path(args[0]).is_file():
+                self.df = readData(args[0], None, *args[1:], **kwargs)
+            elif Path(args[0]).is_dir():
+                self.df = readData(None, args[0], *args[1:], **kwargs)
+            else:
+                raise ('Error: vrong arguments, Data("Path to file") OR Data("Path to DB", tik="SBER")')
         else:
-            raise ('Error: vrong arguments, Data("Path to file") OR Data("Path to DB", tik="SBER")')
+            self.df = readData(None, None, **kwargs)
         assert self.df.shape[0]>Data.indexStartPos, f'Loaded data length less then {Data.indexStartPos}, {self.df.shape[0]}'
         self.iloc = 0
         self.loc = self.df.index[self.iloc]
@@ -492,32 +532,13 @@ class Data1(Data):
         prepMa(self.df)
         prepAtr(self.df)
         # prepFractals(self.df)
-        self.df['MIX'] = [OHLCVtoSeries(fractalsExp(win, 3)) for win in self.df.rolling(window=800)]
+        # self.df['MIX'] = [OHLCVtoSeries(fractalsExp(win, 3)) for win in self.df.rolling(window=800)]
         # self.prepData = prepareData(self.df)
 
     def getState(self, n_days, memory, loc=None, *args, iloc=None, **kwargs):
         # def get_state3(data: list, t: int, n_days=10, memory=None, dataOHLCV=None):
         # data = OHLCVtoSeries(fractalsExp(dataOHLCV.iloc[:t], 3))
         return get_state3(['self.prepData'], iloc, n_days=n_days, memory=memory, dataOHLCV=self.df)
-        data = super().getState(loc, *args, iloc, **kwargs).MIX
-        # n_days = n_days - 1
-        # d = t - n_days + 1
-        block = list(data.iloc[-n_days + 2:])  # if d >= 0 else -d * [data.iloc[0]] + data.iloc[0: t + 1]  # pad with t0
-        # res = []
-        # Запишем текущий профит если сделка была
-        # res.append(expit(dataOHLCV['Close'].iloc[t] - memory[-1] if memory else 0))
-        profit = expit((self.df.Close.iloc[self.iloc] - self.broker.positions.get(self._name).price)
-                       if self.broker.positions.get(self._name) else 0)
-        block.append(profit)
-        # Запишем цену последней сделки относительно цены последнего фрактала
-        #res.append(expit(dataOHLCV['Close'].iloc[t] - data.iloc[-1]))
-        close = expit(self.df.Close.iloc[self.iloc - 1] - data[-1])
-        block.append(close)
-        # Запишем данные цен фракталов относительно цен соответсвующих им предидущих фркталов
-        #     res = res + data.iloc[-(n_days - len(res) + 1):].diff().iloc[-(n_days - len(res)):].apply(expit).to_list()
-        res = np.array([block])
-        return res
-
 
 class Data2(Data):
     ver = 'v03'
@@ -551,15 +572,21 @@ class Data3(Data1):
         calculateFractalsPairs(self.df)
         self.fractalsValues = getStateFractalsValues(self.df)
         self.dfLevels = calcLevelsForEachInterval(self.df)
+        self.df['nLevel'] = np.nan
         for idx, row in self.df.iterrows():
-            self.df.at[idx, 'nLevel'] = \
-                sorted(self.dfLevels.loc[idx.floor(freq='D')], key=lambda x: abs(x - row.Close) / row.Close)[0]
+            try:
+                self.df.at[idx, 'nLevel'] = \
+                    sorted(self.dfLevels.loc[idx.floor(freq='D')], key=lambda x: abs(x - row.Close) / row.Close)[0]
+            except KeyError:
+                pass
         self.dff = pd.DataFrame(
             [np.array(self.fractalsValues.loc[self.fractalsValues.index < idx].Close[-self.window_size + 2:]) -
              self.df.loc[idx].nLevel for idx, row in self.df.iterrows()], index=self.df.index)
-    def getProfit(self,inventory,iloc):
+    def getProfit(self,agent,iloc):
+        inventory = agent.inventory
         lastDealPrice = self.df['Close'].iloc[iloc]
         # if memory have odd cnt of deals profit is sum else need last deal price
+        # stake is profit of closed dials
         longCnt, shortCnt, stake, profit = 0,0,0,0
         for i in inventory:
             if i< 0:
@@ -574,19 +601,22 @@ class Data3(Data1):
                 profit += i
         if longCnt != shortCnt:
             profit += (longCnt - shortCnt)*lastDealPrice
-         # stake is profit of closed dials
-        # stake = sum(inventory[0:divmod(len(inventory), 2)[0] * 2])
+        # else:
+        if len(inventory)//10000 >0:
+            raise Exception(f'inventory exceed: 10000')
+
         reward = expit(((stake-1000) / 1000)-2)-0.5 + expit(((profit-1000) / 1000)+2)-0.5
         return stake, profit, (longCnt - shortCnt), reward
-    def getState(self, n_days, inventory, loc=None, *args, iloc=None, **kwargs):
+    def getState(self, n_days, agent, loc=None, *args, iloc=None, **kwargs):
         """Returns an n-day state representation ending at time t
         """
+        inventory = agent.inventory
         # data = OHLCVtoSeries(fractalsExp(self.df.iloc[:iloc], 3))
         data = self.dff.iloc[iloc].apply(expit).values
         # block = data.iloc[-n_days:]  # if d >= 0 else -d * [data.iloc[0]] + data.iloc[0: t + 1]  # pad with t0
         # res = []
         # Запишем текущий профит если сделка была
-        (stake, profit,*results) = self.getProfit(inventory,iloc)
+        (stake, profit,*results) = self.getProfit(agent,iloc)
 
         # normolise profit
         # profit = expit(profit * Data3.expK) if memory else 0.5
@@ -599,9 +629,9 @@ class Data3(Data1):
         res = np.append(np.array([stake,profit]), data)
         return np.array([res])
 
-class Data3_1(Data3):
+class DataV301(Data3):
     """ Fractals pairs, with levels diff. Based on Data1 """
-    ver = Data3.ver +'-1'
+    ver = Data3.ver +'01'
     description = Data3.description + ' Fractal difference normalised by ATR.'
     expK = 0.001
     def _prepareDf(self,*args, **kwargs):
