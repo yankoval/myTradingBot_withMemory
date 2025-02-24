@@ -1,7 +1,10 @@
+
+# defaults
+
+DEFAULT_SIZE = 1
+
 import numpy as np
-
 from tqdm import tqdm
-
 from .ops import (
     get_state,
     get_state2,
@@ -24,9 +27,10 @@ logger = logging.getLogger(__name__)
 # TODO: Create model with Volume info (optionally Fractal)
 
 
-def train_model(agent, episode, data, ep_count=100, batch_size=32, window_size=10, reward_func=None, tr_strat='Long',
-                get_state=get_state3, data_ohlcv_=None, broker_fee=None,start_from=0):
+def train_model(agent, episode, data, *args, ep_count=100, batch_size=32, window_size=10, reward_func=None, tr_strat='Long',
+                get_state=get_state3, data_ohlcv_=None, broker_fee=None,start_from=0, **kwargs):
     logger.debug(f'train_model: {locals()}')
+    size = kwargs.get('size', DEFAULT_SIZE)
     if callable(reward_func):
         reward_func = reward_func
     elif reward_func == 'calcRewardLine':
@@ -56,13 +60,13 @@ def train_model(agent, episode, data, ep_count=100, batch_size=32, window_size=1
         assert type(action) in [np.int64, int], 'Action must be an integer'
         # BUY
         if action == 1:  # and len(agent.inventory) == 0:
-            agent.inventory.append(-1 * lastDealPrice)
+            agent.inventory.append(-1*size * lastDealPrice)
             # FIXME: Правильно вычислять ревард для всех типов действий: Buy Sell Hold
             total_profit, profit, pos, reward = data.getProfit(agent, t)
 
         # SELL
         elif action == 2:  # and len(agent.inventory) > 0:
-            agent.inventory.append(lastDealPrice)
+            agent.inventory.append(size * lastDealPrice)
             total_profit, profit, pos, reward = data.getProfit(agent, t)
 
         # HOLD
@@ -90,10 +94,25 @@ def train_model(agent, episode, data, ep_count=100, batch_size=32, window_size=1
 
 def evaluate_model(agent, data, window_size, debug, *args, start_from: int = 1,**kwargs):
     assert logger is not None, 'Evaluate logger not set'
+    size = kwargs.get('size', DEFAULT_SIZE)
     bro = data.broker
     data.df[list(range(agent.action_size))] = np.nan
+
+    data.df['BUY'] = np.nan
+    data.df['SELL'] = np.nan
+
     data.df['cash'] = np.nan
     data.df['value'] = np.nan
+    data.df['posAvgPrice'] = np.nan
+    # total_profit_, profit, pos, reward
+    data.df['total_profit_'] = np.nan
+    data.df['profit_'] = np.nan
+    data.df['pos_'] = np.nan
+    data.df['reward_'] = np.nan
+    data.df['pos'] = np.nan
+    data.df['maxDrawdown'] = np.nan
+    data.df['total_profit'] = np.nan
+
     # get_state=get_state3, dataOHLCV=None, brokerFee=None,startFrom:int=0):
     # if callable(rewardFunc):
     #     rewardFunc = rewardFunc
@@ -114,12 +133,12 @@ def evaluate_model(agent, data, window_size, debug, *args, start_from: int = 1,*
     brokerFee = data.broker.getcommissioninfo(data)
     brokerFee = brokerFee.p.commission
     data.iloc = start_from
-    for t in tqdm(range(start_from, data_length - 2), leave=True,
+    for t in tqdm(range(start_from + 1, data_length - 2), leave=True,
                   desc=f'Evaluate model, episode {start_from}/{data_length - 2}.'):
         data.next()
         currentDealPrice = data.df.Close.iloc[data.iloc]
         reward = .5
-        pos = bro.getposition()
+        # pos = bro.getposition()
         try:
             next_state = data.getState(window_size, agent, iloc=data.iloc + 1)
         except:
@@ -132,9 +151,10 @@ def evaluate_model(agent, data, window_size, debug, *args, start_from: int = 1,*
         #print(f'Action:{action}')
         # BUY
         if action == 1:  # and len(agent.inventory) == 0:
-            res = data.broker.buy(size=1)
+            res = data.broker.buy(size=size)
             if res:
-                agent.inventory.append(-1 * currentDealPrice)
+                agent.inventory.append(-1* size * currentDealPrice)
+                data.df.at[data.loc, 'BUY'] = size
                 # FIXME: Правильно вычислять ревард для всех типов действий: Buy Sell Hold
                 total_profit_, profit, pos, reward = data.getProfit(agent, t)
                 # total_profit += -currentDealPrice * brokerFee if brokerFee else 0
@@ -149,11 +169,11 @@ def evaluate_model(agent, data, window_size, debug, *args, start_from: int = 1,*
                     logger.debug(f'total_profit_:{total_profit_}, profit:{profit}, pos:{pos}, reward:{reward},')
         # SELL
         elif action == 2:  # and pos.size>0:
-            res = data.broker.sell(size=1)
+            res = data.broker.sell(size=size)
             if res:
-                # bought_price = agent.inventory.pop(0)
-                bought_price = pos.price
-                agent.inventory.append(currentDealPrice)
+                # bought_price = pos.price
+                agent.inventory.append(size * currentDealPrice)
+                data.df.at[data.loc, 'SELL'] = size
                 total_profit_, profit, pos, reward = data.getProfit(agent, t)
                 total_profit = bro.get_cash() + bro.getvalue(data) - bro.startingcash
                 # reward = rewardFunc(pos.size*pos.price, data[0] + total_profit)
@@ -179,8 +199,24 @@ def evaluate_model(agent, data, window_size, debug, *args, start_from: int = 1,*
                 f'bro.getposition():{bro.getposition()}')
             logger.debug(f'total_profit_:{total_profit_}, profit:{profit}, pos:{pos}, reward:{reward},')
 
+        # Write history broker
         data.df.at[data.loc, 'cash'] = bro.get_cash()
         data.df.at[data.loc, 'value'] = bro.getvalue()
+        data.df.at[data.loc, 'pos'] = bro.getposition().size
+        data.df.at[data.loc, 'posAvgPrice'] = bro.getposition().price
+        data.df.at[data.loc, 'total_profit'] = total_profit
+        data.df.at[data.loc, 'maxDrawdown'] = maxDrawdownAbs
+        # debug simple broker data
+        data.df.at[data.loc, 'total_profit_'] = total_profit_
+        data.df.at[data.loc, 'profit_'] = profit
+        data.df.at[data.loc, 'pos_'] = pos
+        data.df.at[data.loc, 'reward_'] = reward
+
+        if abs(total_profit - (total_profit_ + profit)).round(2)> 0:
+            logger.error('broker profit value error')
+        if pos != bro.getposition().size:
+            logger.error('broker profit qty error')
+
         done = (t == data_length - 3)
         # agent.memory.append((state, action, reward, next_state, done))
 

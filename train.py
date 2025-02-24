@@ -166,13 +166,6 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
     logger.info(f'Validation data data shape:{val_dataOHLCV.df.shape}, tfCounts: {tfCounts}, from:{val_dataOHLCV.df.index[0]} '
                 f'to:{val_dataOHLCV.df.index[-1]}.')
     assert val_dataOHLCV.df.shape[0] > 800 , f'Shape:{val_dataOHLCV.df.shape} < 800.'
-    val_dataOHLCV.next(iloc=start_from)
-    valBro = qbroker(cash=1000000)
-    # valBro.set_cash(1000)
-    valBro.setcommission(commission=0.0001, name=tik)
-    val_dataOHLCV.setBroker(valBro)
-    sizer = AllInSizer()
-    val_dataOHLCV.setsizer(sizer)
     if val_dataOHLCV.df.empty:
         logger.error('Validate dataset is empty.') #8988 623 30 01 марг мих 370
         return (-1)
@@ -192,6 +185,14 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
                     logger.error(f'window size parameter not match to loadad model. Set window size from loaded model!')
                     return (-1)
                     # window_size = agent.state_size
+                val_dataOHLCV.next(iloc=start_from)
+                valBro = qbroker(cash=1000000)
+                # valBro.set_cash(1000)
+                valBro.setcommission(commission=0.0001, name=tik)
+                val_dataOHLCV.setBroker(valBro)
+                sizer = AllInSizer()
+                val_dataOHLCV.setsizer(sizer)
+
                 val_result, history, maxDrawdownAbs = evaluate_model(agent, val_dataOHLCV, window_size, debug
                                                                      ,start_from=start_from,
                                                                      logger=logger)

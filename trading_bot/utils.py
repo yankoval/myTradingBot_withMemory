@@ -182,7 +182,9 @@ def pltHist(dfin, hist, fName=None, start_from=0):
     logger.debug(f'plt begining...')
     for slot in range(df.shape[0]//1000):
         day_df = df.iloc[slot * 1000 : (slot+1) * 1000]
-        # Major ticks every 20, minor ticks every 5
+        if not (day_df.BUY.any() or day_df.SELL.any() ):
+            logger.debug(f'Slot:{slot} skipped due to not buying or selling.')
+            continue # В периоде нет сделок
         major_ticks = np.arange(0, day_df.shape[0], day_df.shape[0] / 5)
         major_ticks = day_df.iloc[major_ticks].index
         minor_ticks = np.arange(0, day_df.shape[0], day_df.shape[0] / 10)
@@ -196,13 +198,17 @@ def pltHist(dfin, hist, fName=None, start_from=0):
                 'height_ratios': [3, 3, 3, 3, 3, 1, 6]}
                                                                                 , figsize=(day_df.shape[0] // 15, 12))
             logger.debug('plt started plt.subplots')
-            ax0.plot(day_df.index, day_df.portfolio)
+            ax0.plot(day_df.index, day_df.total_profit)
             plt.setp(ax0.get_xticklabels(), visible=False)
             ax0.grid(which='both')
-            ax1.plot(day_df.index, day_df.curPosQty)
+
+            ax1.plot(day_df.index, day_df.pos)
+            ax1.text(0.01, 0.9, 'curPosQty', transform=ax1.transAxes)
+            ax1.hlines(0,xmin=ax1.get_xlim()[0],xmax=ax1.get_xlim()[1],colors='gray', linestyles='--')
+
             # make these tick labels invisible
             plt.setp(ax1.get_xticklabels(), visible=False)
-            axmdd.plot(day_df.index, day_df.maxDD)
+            axmdd.plot(day_df.index, day_df.maxDrawdown)
             # make these tick labels invisible
             plt.setp(axmdd.get_xticklabels(), visible=False)
             for i in range(3):
@@ -214,19 +220,21 @@ def pltHist(dfin, hist, fName=None, start_from=0):
             axValue.text(0.01, 0.9, 'Value', transform=axValue.transAxes)
             ax2.plot(day_df.index, day_df.High, 'g')
             ax2.plot(day_df.index, day_df.Low, 'y')
-            ax2.scatter(pd.DataFrame(np.array(b).transpose()).loc[
-                            ((np.array(b)[0] - shift > slot * 1000) & ((slot + 1) * 1000 > np.array(b)[0] - shift)), [
-                                0]] - shift - slot * 1000, pd.DataFrame(np.array(b).transpose()).loc[
-                            ((np.array(b)[0] - shift > slot * 1000) & ((slot + 1) * 1000 > np.array(b)[0] - shift)), [
-                                1]], marker='^', s=200, color='green',
-                        alpha=0.5)
+            ax2.scatter(day_df.Close.loc[day_df.BUY.notna()].index, y=day_df.Close.loc[day_df.BUY.notna()]
+            # ax2.scatter(pd.DataFrame(np.array(b).transpose()).loc[
+            #                 ((np.array(b)[0] - shift > slot * 1000) & ((slot + 1) * 1000 > np.array(b)[0] - shift)), [
+            #                     0]] - shift - slot * 1000, pd.DataFrame(np.array(b).transpose()).loc[
+            #                 ((np.array(b)[0] - shift > slot * 1000) & ((slot + 1) * 1000 > np.array(b)[0] - shift)), [
+            #                     1]]
+                        , marker='^', s=200, color='green', alpha=0.5)
             # ax2.scatter(day_df.iloc[list(map(lambda x: x - shift, b[0]))].index, b[1], marker='^', s=200, color='green',
             #             alpha=0.5)
-            ax2.scatter(pd.DataFrame(np.array(s).transpose()).loc[
-                            ((np.array(s)[0] - shift > slot * 1000) & ((slot + 1) * 1000 > np.array(s)[0] - shift)), [
-                                0]] - shift - slot * 1000, pd.DataFrame(np.array(s).transpose()).loc[
-                            ((np.array(s)[0] - shift > slot * 1000) & ((slot + 1) * 1000 > np.array(s)[0] - shift)), [
-                                1]], marker='v', s=200, color='red',alpha=0.3)
+            ax2.scatter(day_df.Close.loc[day_df.SELL.notna()].index, y=day_df.Close.loc[day_df.SELL.notna()]
+            # ax2.scatter(pd.DataFrame(np.array(s).transpose()).loc[
+            #                 ((np.array(s)[0] - shift > slot * 1000) & ((slot + 1) * 1000 > np.array(s)[0] - shift)), [
+            #                     0]] - shift - slot * 1000, pd.DataFrame(np.array(s).transpose()).loc[
+            #                 ((np.array(s)[0] - shift > slot * 1000) & ((slot + 1) * 1000 > np.array(s)[0] - shift)), [1]]
+            , marker='v', s=200, color='red',alpha=0.3)
 
             # ax2.scatter(day_df.iloc[list(map(lambda x: x - shift, s[0]))].index, s[1], marker='v', s=200, color='red',
             #             alpha=0.3)
@@ -244,18 +252,18 @@ def pltHist(dfin, hist, fName=None, start_from=0):
             # Or if you want different settings for the grids:
             ax2.text(0.01, 0.9, fName, transform=ax2.transAxes)  # ,day_df.High.max()-dRange/10
             ax0.text(0.01, 0.9,
-                     f'portfolio, max:{day_df.portfolio.max():0.2f}, '
+                     f'portfolio, max:{day_df.total_profit.max():0.2f}, '
                      f'start:{day_df.Close.iloc[10] * dealQty:0.2f}'
-                     f', end:{day_df.portfolio.iloc[-1]:0.2f}, '
-                     f'%{(day_df.portfolio.iloc[-1] - day_df.portfolio.iloc[0]) / (day_df.portfolio.iloc[0]):0.2f}'
+                     f', end:{day_df.total_profit.iloc[-1]:0.2f}, '
+                     f'%{(day_df.total_profit.iloc[-1] - day_df.total_profit.iloc[0]) / (day_df.total_profit.iloc[0]):0.2f}'
                      , transform=ax0.transAxes)
-            ax1.text(0.01, 0.9, 'curPosQty', transform=ax1.transAxes)
-            maxDD = day_df.maxDD.min()
+
+            maxDD = day_df.maxDrawdown.min()
             axmdd.text(0.01, 0.9, f'Max Drop Down Abs:{maxDD:0.2f}, :{maxDD / day_df.portfolio.iloc[0]:0.2f}%',
                        transform=axmdd.transAxes)
 
             if fName:
-                plt.savefig(Path.cwd() / 'graphs' / (fName+'_slot_' +str(slot)+ '.svg'))
+                plt.savefig(Path.cwd() / 'graphs' / (fName+'_slot_' +str(slot)+ '.jpg'),dpi=300)
         except Exception as e:
             logger.error(f'pltHist error:{str(e)}, {traceback.format_exc()}')
 
@@ -269,6 +277,10 @@ def show_train_result(result, val_position, initial_offset, history=None, data=N
     data: Data obj
 
     """
+    if not history:
+        logger.error('No deals!!!')
+        return None
+
     assert data is not None, 'Set up show_train_result params'
     if type(data) is pd.DataFrame:
         df = data
@@ -276,20 +288,16 @@ def show_train_result(result, val_position, initial_offset, history=None, data=N
         data = data
         df = data.df
 
-    b,s = [[], []],[[], []]
-    if history:
-        # print(filter(lambda l: l[2]!='HOLD',history))
-        pltHist(data, history, f'{modelName if modelName else "Graph"}_{result[0]:03d}', start_from=start_from)
-        b = [[r[0] for r in history if r[2] == 'BUY'], [r[1] for r in history if r[2] == 'BUY']]
-        s = [[r[0] for r in history if r[2] == 'SELL'], [r[1] for r in history if r[2] == 'SELL']]
-    else:
-        print('No deals!!!')
-    lText = f'Episode {result[0]}/{result[1]} - Train Position: {format_position(result[2])} '
-    lText = lText + f' Val Position: ' \
-                    f'{"USELESS" if val_position == initial_offset or val_position == 0.0 else format_position(val_position)}, ' \
-                    f'maxDrawdownAbs:${maxDrawdownAbs:.2f}, '
-
+    # print(filter(lambda l: l[2]!='HOLD',history))
+    pltHist(data, history, f'{modelName if modelName else "Graph"}_{result[0]:03d}', start_from=start_from)
+    b = [[r[0] for r in history if r[2] == 'BUY']+[], [r[1] for r in history if r[2] == 'BUY']+[]]
+    s = [[r[0] for r in history if r[2] == 'SELL']+[], [r[1] for r in history if r[2] == 'SELL']+[]]
+    lText = "Error when preparing result text."
     try:
+        lText = f'Episode {result[0]}/{result[1]} - Train Position: {format_position(result[2])} '
+        lText = lText + f' Val Position: ' \
+                        f'{"USELESS" if val_position == initial_offset or val_position == 0.0 else format_position(val_position)}, ' \
+                        f'maxDrawdownAbs:${maxDrawdownAbs:.2f}, '
         lText = lText + f' last BUY:{b[1][-1]} last close: {df.iloc[-1].Close}, BUY qty: {len(b[0])} ' \
                         f'SELL qty:{len(s[0])} positionL {len(b[0]) - len(s[0])}'
         lText = lText + f' Train Loss: {result[3]:.4f} , buy deals qty: {len(b[0]) if b else 0}.'
@@ -368,11 +376,11 @@ class Data:
         if loc:
             self.loc = loc
             iloc = self.df.index.get_loc(self.loc)
-            assert iloc >= self.iloc
+            # assert iloc >= self.iloc
             self.iloc = iloc
             return
         if iloc:
-            assert iloc >= self.iloc
+            # assert iloc >= self.iloc
             self.iloc = iloc
             self.loc = self.df.index[self.iloc]
             return
