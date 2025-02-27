@@ -14,7 +14,9 @@ from tensorflow.keras.models import load_model, clone_model
 from tensorflow.keras.layers import Dense, LSTM
 #from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.optimizers import Adam
-
+from pathlib import Path
+import logging
+logger = logging.getLogger(__name__)
 def switch_k_backend_device():
     """ Switches `keras` backend from GPU to CPU if required.
 
@@ -53,8 +55,10 @@ class Agent:
 
         # Switch off gpu if not detected
         physical_devices = tf.config.list_physical_devices('GPU')
+        logger.info(f'Physical devices: {physical_devices}')
         if physical_devices:
             tf.config.experimental.set_memory_growth(physical_devices[0], True)
+            logger.info(f'Device svitched off: {physical_devices}')
         # Check strategy
         if strategy not in ["t-dqn", "double-dqn", "dqn"]:
             raise
@@ -79,7 +83,8 @@ class Agent:
         self.optimizer = Adam(learning_rate=self.learning_rate)
 
         if pretrained:
-            self.model = self._load()
+
+            self.model = self._load(pretrained=True)
             config = self.model.get_config()  # Returns pretty much every information about your model
             try:
                 self.state_size = config["layers"][0]["config"]["batch_input_shape"][1]
@@ -223,14 +228,16 @@ class Agent:
             model_name = os.path.join(self.modelPath,f"{self.model_name}.keras")
         self.model.save(model_name)
 
-    def _load(self, model_name=None):
+    def _load(self, model_name=None, pretrained=False):
         """Load saved model, model_name is filename with extension:str"""
         model_name = model_name if model_name else self.model_name
+        if pretrained:
+            model_name = self._getLatestPretrainedModelFilename(model_name)
         model_name = model_name if model_name[-6:] == '.keras' else model_name + '.keras'
         try:
             return load_model(os.path.join(self.modelPath, model_name) , custom_objects=self.custom_objects)
         except:
-            print(f'Error reading model from:{model_name} ')
+            logger.error(f'Error reading model from:{model_name} ')
             raise
 
 
@@ -252,3 +259,19 @@ class AgentF(Agent):
         model.compile(loss=self.loss, optimizer=self.optimizer)
         return model
     
+    def _getLatestPretrainedModelFilename(self, model_name=''):
+        # Define the directory and the pattern
+        directory = Path(self.modelPath)
+        model_name = model_name if model_name else self.model_name
+        pattern = model_name + '_episode_*.keras'  # Example: all text files
+        # Get the list of files matching the pattern
+        try:
+            l = sorted(list(filter(lambda x: x.is_file(), list(Path(directory).glob(pattern)))),
+                       key=lambda x: int(x.stem.split('_')[-1]), reverse=True)
+            logger.debug(l[0:1])
+            return l[0].stem
+        except Exception as e:
+            logger.error(f'No pretrained model found: {e}')
+            raise Exception(f'No pretrained model found: {e}')
+
+        return os.path.join(self.modelPath,f"{self.model_name}.keras")

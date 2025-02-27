@@ -59,7 +59,7 @@ def calculateFractalsPairs(df, CalculateValues=True, CalculateTimeDiff=True):
     )
     # Calculate High fractal coresponded all Low froctals
     df['fHigh'] = np.where(df.fLow, df.index.to_series().values.astype("float64"), np.nan)
-    df['fHigh'] = df['fHigh'].fillna(method='ffill')
+    df['fHigh'] = df['fHigh'].ffill() # fillna(method='ffill')
     df['fHigh'] = np.where(df.index == df.groupby(['fHigh'])['High'].transform('idxmax'), True, False)
 
 
@@ -181,7 +181,7 @@ def pltHist(dfin, hist, fName=None, start_from=0):
 
     logger.debug(f'plt begining...')
     for slot in range(df.shape[0]//1000):
-        day_df = df.iloc[slot * 1000 : (slot+1) * 1000]
+        day_df = df.iloc[slot * 1000+1 : (slot+1) * 1000]
         if not (day_df.BUY.any() or day_df.SELL.any() ):
             logger.debug(f'Slot:{slot} skipped due to not buying or selling.')
             continue # В периоде нет сделок
@@ -251,11 +251,13 @@ def pltHist(dfin, hist, fName=None, start_from=0):
 
             # Or if you want different settings for the grids:
             ax2.text(0.01, 0.9, fName, transform=ax2.transAxes)  # ,day_df.High.max()-dRange/10
+            startStake = day_df.cash.iloc[0] + day_df.total_profit.iloc[0]
+            endStake = day_df.cash.iloc[-1] + day_df.total_profit.iloc[-1]
             ax0.text(0.01, 0.9,
                      f'portfolio, max:{day_df.total_profit.max():0.2f}, '
-                     f'start:{day_df.Close.iloc[10] * dealQty:0.2f}'
-                     f', end:{day_df.total_profit.iloc[-1]:0.2f}, '
-                     f'%{(day_df.total_profit.iloc[-1] - day_df.total_profit.iloc[0]) / (day_df.total_profit.iloc[0]):0.2f}'
+                     f'start:{startStake:0.2f}'
+                     f', end:{endStake:0.2f}, '
+                     f'%{(endStake - startStake) / startStake:0.2f}'
                      , transform=ax0.transAxes)
 
             maxDD = day_df.maxDrawdown.min()
@@ -644,5 +646,35 @@ class DataV301(Data3):
     expK = 0.001
     def _prepareDf(self,*args, **kwargs):
         super()._prepareDf(*args, **kwargs)
+        self.atrMean = self.df.ATR.mean()
+        self.dff = self.dff / self.atrMean
+class DataV302(Data3):
+    """ Fractals pairs, with levels diff. Based on Data1 """
+    ver = Data3.ver +'02'
+    description = Data3.description + ' Fractal difference(ver2)  normalised by ATR.'
+    expK = 0.001
+    def _prepareDf(self,*args, **kwargs):
+        super()._prepareDf(*args, **kwargs)
+        calculateFractalsPairs(self.df)
+        self.fractalsValues = getStateFractalsValues(self.df)
+        self.dfLevels = calcLevelsForEachInterval(self.df)
+        self.df['nLevel'] = np.nan
+        for idx, row in self.df.iterrows():
+            try:
+                self.df.at[idx, 'nLevel'] = \
+                    sorted(self.dfLevels.loc[idx.floor(freq='D')], key=lambda x: abs(x - row.Close) / row.Close)[0]
+            except KeyError:
+                pass
+        self.dff = pd.DataFrame(
+            [self.fractalsValues.loc[self.fractalsValues.index <=idx].iloc[-self.window_size + 2:].Close.values
+             - row.nLevel for idx, row in self.df.iterrows()
+             ], index=self.df.index)
+        # = pd.DataFrame(index=self.df.index, columns=pd.RangeIndex(start=0, stop=(self.window_size - 2), step=1))
+        # for tIdx, row in self.df.iterrows():
+        #     for cIdx, lRow in enumerate(self.fractalsValues.Close.loc[self.fractalsValues.index <= tIdx].iloc[-self.window_size + 2:] - row.nLevel):
+        #         self.dff.at[tIdx, cIdx] = lRow
+
+        # normalise by ATR mean
+        #^todo: normalise by rolling window ATR mean
         self.atrMean = self.df.ATR.mean()
         self.dff = self.dff / self.atrMean
