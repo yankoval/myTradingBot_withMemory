@@ -219,6 +219,14 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
                                    broker_fee=0.0001
                                    )
         try:
+            val_dataOHLCV.next(iloc=start_from)
+            valBro = qbroker(cash=1000000)
+            # valBro.set_cash(1000)
+            valBro.setcommission(commission=0.0001, name=tik)
+            val_dataOHLCV.setBroker(valBro)
+            sizer = AllInSizer()
+            val_dataOHLCV.setsizer(sizer)
+
             val_result, history, maxDrawdownAbs = evaluate_model(agent, val_dataOHLCV, window_size
                                                                  , debug
                                                                  , logger=logger

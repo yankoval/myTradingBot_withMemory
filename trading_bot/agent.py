@@ -231,7 +231,7 @@ class Agent:
     def _load(self, model_name=None, pretrained=False):
         """Load saved model, model_name is filename with extension:str"""
         model_name = model_name if model_name else self.model_name
-        if pretrained:
+        if pretrained and 'episode' not in self.model_name.split('_'):
             model_name = self._getLatestPretrainedModelFilename(model_name)
         model_name = model_name if model_name[-6:] == '.keras' else model_name + '.keras'
         try:

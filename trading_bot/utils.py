@@ -180,7 +180,7 @@ def pltHist(dfin, hist, fName=None, start_from=0):
 
 
     logger.debug(f'plt begining...')
-    for slot in range(df.shape[0]//1000):
+    for slot in range(df.shape[0]//1000+1):
         day_df = df.iloc[slot * 1000+1 : (slot+1) * 1000]
         if not (day_df.BUY.any() or day_df.SELL.any() ):
             logger.debug(f'Slot:{slot} skipped due to not buying or selling.')
