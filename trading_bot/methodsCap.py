@@ -120,7 +120,7 @@ def evaluate_model(agent, data, window_size, debug, *args, start_from: int = 1,*
     #     rewardFunc = calcRewardLineSigmoid
     # else:
     #     rewardFunc = calcRewardExp
-    total_profit = 0
+    total_profit, total_profit_ = 0, 0
     maxDrawdownAbs = 0
     cumulativeDrawdownAbs = 0  # Profit/Loss Summ on each step represent probability of profit
     data_length = data.df.shape[0] - 1

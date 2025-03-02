@@ -85,6 +85,7 @@ class Agent:
         if pretrained:
 
             self.model = self._load(pretrained=True)
+            #todo: Load epsilon and ather state.
             config = self.model.get_config()  # Returns pretty much every information about your model
             try:
                 self.state_size = config["layers"][0]["config"]["batch_input_shape"][1]
