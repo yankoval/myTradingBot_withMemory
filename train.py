@@ -208,9 +208,16 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
 
     # Train model
     agent = Agent(window_size, strategy=strategy, pretrained=pretrained, model_name=model_name)
-    if not pretrained:
-        agent.save(0)
+    # if not pretrained:
+    #     agent.save(0)
     for episode in range(1, ep_count + 1):
+        train_data.next(iloc=start_from)
+        bro = qbroker(cash=1000000)
+        # valBro.set_cash(1000)
+        bro.setcommission(commission=0.0001, name=tik)
+        train_data.setBroker(bro)
+        sizer = AllInSizer()
+        train_data.setsizer(sizer)
         train_result = train_model(agent, episode, train_data, ep_count=ep_count,
                                    batch_size=batch_size, window_size=window_size,
                                    reward_func='calcRewardLine',

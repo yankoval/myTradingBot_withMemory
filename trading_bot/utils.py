@@ -180,7 +180,9 @@ def pltHist(dfin, hist, fName=None, start_from=0):
 
 
     logger.debug(f'plt begining...')
-    for slot in range(df.shape[0]//1000+1):
+    slotMax = df.shape[0]//1000+1
+    logger.debug(f'slotMax:{slotMax}')
+    for slot in range(slotMax):
         day_df = df.iloc[slot * 1000+1 : (slot+1) * 1000]
         if not (day_df.BUY.any() or day_df.SELL.any() ):
             logger.debug(f'Slot:{slot} skipped due to not buying or selling.')
@@ -265,7 +267,7 @@ def pltHist(dfin, hist, fName=None, start_from=0):
                        transform=axmdd.transAxes)
 
             if fName:
-                plt.savefig(Path.cwd() / 'graphs' / (fName+'_slot_' +str(slot)+ '.jpg'),dpi=300)
+                plt.savefig(Path.cwd() / 'graphs' / (fName+f'_slot_{slot}in{slotMax}.jpg'),dpi=300)
         except Exception as e:
             logger.error(f'pltHist error:{str(e)}, {traceback.format_exc()}')
 
@@ -597,26 +599,26 @@ class Data3(Data1):
         lastDealPrice = self.df['Close'].iloc[iloc]
         # if memory have odd cnt of deals profit is sum else need last deal price
         # stake is profit of closed dials
-        longCnt, shortCnt, stake, profit = 0,0,0,0
+        longCnt, shortCnt, totProfit, curPosProfit = 0,0,0,0
         for i in inventory:
             if i< 0:
                 longCnt +=1
             else:
                 shortCnt +=1
             if longCnt == shortCnt:
-                profit += i
-                stake += profit
-                profit = 0
+                curPosProfit += i
+                totProfit += curPosProfit
+                curPosProfit = 0
             else:
-                profit += i
+                curPosProfit += i
         if longCnt != shortCnt:
-            profit += (longCnt - shortCnt)*lastDealPrice
+            curPosProfit += (longCnt - shortCnt)*lastDealPrice
         # else:
         if len(inventory)//10000 >0:
             raise Exception(f'inventory exceed: 10000')
 
-        reward = expit(((stake-1000) / 1000)-2)-0.5 + expit(((profit-1000) / 1000)+2)-0.5
-        return stake, profit, (longCnt - shortCnt), reward
+        reward = expit(((totProfit-1000) / 1000)-2)-0.5 + expit(((curPosProfit-1000) / 1000)+2)-0.5
+        return totProfit, curPosProfit, (longCnt - shortCnt), reward
     def getState(self, n_days, agent, loc=None, *args, iloc=None, **kwargs):
         """Returns an n-day state representation ending at time t
         """
@@ -678,3 +680,20 @@ class DataV302(Data3):
         #^todo: normalise by rolling window ATR mean
         self.atrMean = self.df.ATR.mean()
         self.dff = self.dff / self.atrMean
+
+class DataV303(DataV302):
+    """ Fractals pairs, with levels diff. Based on Data3 with bug fix in get state. """
+    def getState(self, n_days, agent, loc=None, *args, iloc=None, **kwargs):
+        """Returns an n-day state representation ending at time t
+        """
+        data = self.dff.iloc[iloc].apply(expit).values
+        # Запишем текущий профит если сделка была
+        # (totProfit, curPosProfit, pos, *results) = self.getProfit(agent, iloc)
+        totProfit = self.broker.get_cash() - self.broker.startingcash
+        totProfit = expit(((totProfit - 1000) / 1000) - 2)
+        curPosProfit = self.broker.getvalue()
+        curPosProfit = expit(((curPosProfit - 1000) / 1000) + 2)
+        pos = expit(self.broker.getposition().size)
+        finState = [totProfit, curPosProfit, pos]
+        res = np.append(np.array(finState), data[-(n_days - len(finState)):])
+        return np.array([res])
