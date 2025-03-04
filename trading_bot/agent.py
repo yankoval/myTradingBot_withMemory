@@ -83,6 +83,8 @@ class Agent:
         self.custom_objects = {"huber_loss": huber_loss}  # important for loading the model from memory
         self.optimizer = Adam(learning_rate=self.learning_rate)
 
+        self.episode = 1
+
         if pretrained:
 
             self.model, episode,*params = self._load(pretrained=True)
