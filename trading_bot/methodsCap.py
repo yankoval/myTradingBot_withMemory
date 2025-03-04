@@ -27,9 +27,10 @@ logger = logging.getLogger(__name__)
 # TODO: Create model with Volume info (optionally Fractal)
 
 
-def train_model(agent, episode, data, *args, ep_count=100, batch_size=32, window_size=10, reward_func=None, tr_strat='Long',
+def train_model(agent, data, *args,episode=None, ep_count=100, batch_size=32, window_size=10, reward_func=None, tr_strat='Long',
                 get_state=get_state3, data_ohlcv_=None, broker_fee=None,start_from=0, **kwargs):
     logger.debug(f'train_model: {locals()}')
+    agent.episode = episode if episode else agent.episode
     size = kwargs.get('size', DEFAULT_SIZE)
     if callable(reward_func):
         reward_func = reward_func
@@ -84,7 +85,7 @@ def train_model(agent, episode, data, *args, ep_count=100, batch_size=32, window
             avg_loss.append(loss)
 
         state = next_state
-
+    agent.episode += 1
     if episode % 1 == 0:
         agent.save(episode)
         logger.info(f'Episode {episode} saved')
@@ -120,7 +121,7 @@ def evaluate_model(agent, data, window_size, debug, *args, start_from: int = 1,*
     #     rewardFunc = calcRewardLineSigmoid
     # else:
     #     rewardFunc = calcRewardExp
-    total_profit, total_profit_, profit = 0, 0, 0
+    total_profit, total_profit_, profit, pos = 0, 0, 0, 0
     maxDrawdownAbs = 0
     cumulativeDrawdownAbs = 0  # Profit/Loss Summ on each step represent probability of profit
     data_length = data.df.shape[0] - 1
@@ -212,7 +213,7 @@ def evaluate_model(agent, data, window_size, debug, *args, start_from: int = 1,*
         data.df.at[data.loc, 'pos_'] = pos
         data.df.at[data.loc, 'reward_'] = reward
 
-        if abs(total_profit - (total_profit_ + profit)).round(2)> 0:
+        if round(abs(total_profit - (total_profit_ + profit)),2)> 0:
             logger.error('broker profit value error')
         if pos != bro.getposition().size:
             logger.error('broker profit qty error')

@@ -683,6 +683,7 @@ class DataV302(Data3):
 
 class DataV303(DataV302):
     """ Fractals pairs, with levels diff. Based on Data3 with bug fix in get state. """
+    ver = 'v0303'
     def getState(self, n_days, agent, loc=None, *args, iloc=None, **kwargs):
         """Returns an n-day state representation ending at time t
         """

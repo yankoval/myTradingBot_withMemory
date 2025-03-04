@@ -123,7 +123,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
     Agent = importlib.import_module('trading_bot.agent').__dict__[agentClass]
 
     if model_name in ['model_debug',None]:
-        model_name = f'qt_v09_{strategy}_{trStrat}_{window_size}_{batch_size}_{tik}_{tFrame}_Agent_{Agent.ver}_Data_{Data.ver}'
+        model_name = f'qt_v09_{strategy}_{trStrat}_{window_size}_{batch_size}_{tik}_{tFrame}_Agent_{agentClass}_Data_{dataClass}'
 
     coloredlogs.install(fmt=f'%(asctime)s,%(name)s,%(levelname)s,{model_name}: %(message)s', logger=logger)
 
@@ -210,7 +210,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
     agent = Agent(window_size, strategy=strategy, pretrained=pretrained, model_name=model_name)
     # if not pretrained:
     #     agent.save(0)
-    for episode in range(1, ep_count + 1):
+    for episode in range(agent.episode, ep_count + 1):
         train_data.next(iloc=start_from)
         bro = qbroker(cash=1000000)
         # valBro.set_cash(1000)
@@ -218,7 +218,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
         train_data.setBroker(bro)
         sizer = AllInSizer()
         train_data.setsizer(sizer)
-        train_result = train_model(agent, episode, train_data, ep_count=ep_count,
+        train_result = train_model(agent, train_data, episode=episode, ep_count=ep_count,
                                    batch_size=batch_size, window_size=window_size,
                                    reward_func='calcRewardLine',
                                    tr_strat=trStrat,

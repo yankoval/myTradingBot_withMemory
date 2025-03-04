@@ -45,7 +45,7 @@ class Agent:
     description = 'Base q-lerning agen and model'
 
     def __init__(self, state_size, strategy="t-dqn", reset_every=1000
-                 , pretrained=False, model_name=None,modelPath=None):
+                 , pretrained=False, model_name=None,modelPath=None, epsilonInit=0.99):
 
         print(self.description)
         if modelPath is None:
@@ -70,13 +70,14 @@ class Agent:
         self.inventory = []
         self.memory = deque(maxlen=10000)
         self.first_iter = True
+        self.epsilon = 1
 
         # model config
         self.model_name = model_name
         self.gamma = 0.98 # affinity for long term reward
-        self.epsilon = 0.99
+        self.epsilon = epsilonInit
         self.epsilon_min = 0.1
-        self.epsilon_decay = 0.99999
+        self.epsilon_decay = 0.95
         self.learning_rate = 0.0005
         self.loss = huber_loss
         self.custom_objects = {"huber_loss": huber_loss}  # important for loading the model from memory
@@ -84,7 +85,9 @@ class Agent:
 
         if pretrained:
 
-            self.model = self._load(pretrained=True)
+            self.model, episode,*params = self._load(pretrained=True)
+            self.episode = episode
+            self.epsilon = epsilonInit * self.epsilon_decay ** episode
             #todo: Load epsilon and ather state.
             config = self.model.get_config()  # Returns pretty much every information about your model
             try:
@@ -231,16 +234,36 @@ class Agent:
 
     def _load(self, model_name=None, pretrained=False):
         """Load saved model, model_name is filename with extension:str"""
+        params = []
         model_name = model_name if model_name else self.model_name
         if pretrained and 'episode' not in self.model_name.split('_'):
             model_name = self._getLatestPretrainedModelFilename(model_name)
+        params.append(int(model_name.split('_')[-1]))
+        assert len(params) == 1
         model_name = model_name if model_name[-6:] == '.keras' else model_name + '.keras'
         try:
-            return load_model(os.path.join(self.modelPath, model_name) , custom_objects=self.custom_objects)
+            return load_model(os.path.join(self.modelPath, model_name) , custom_objects=self.custom_objects), *params
         except:
             logger.error(f'Error reading model from:{model_name} ')
             raise
+    def _getLatestPretrainedModelFilename(self, model_name=''):
+        """ Look pretrined model files in current dir acording to '_episode_N' pattern.
+        return latest file name  without extension."""
+        # Define the directory and the pattern
+        directory = Path(self.modelPath)
+        model_name = model_name if model_name else self.model_name
+        pattern = model_name + '_episode_*.keras'  # Example: all text files
+        # Get the list of files matching the pattern
+        try:
+            l = sorted(list(filter(lambda x: x.is_file(), list(Path(directory).glob(pattern)))),
+                       key=lambda x: int(x.stem.split('_')[-1]), reverse=True)
+            logger.debug(l[0:1])
+            return l[0].stem
+        except Exception as e:
+            logger.error(f'No pretrained model found. directory:{directory}, pattern:{pattern}, error: {e}')
+            raise Exception(f'No pretrained model found: {e}')
 
+        return os.path.join(self.modelPath,f"{self.model_name}.keras")
 
 class AgentF(Agent):
     ver = Agent.ver+'-2'
@@ -259,20 +282,3 @@ class AgentF(Agent):
 
         model.compile(loss=self.loss, optimizer=self.optimizer)
         return model
-    
-    def _getLatestPretrainedModelFilename(self, model_name=''):
-        # Define the directory and the pattern
-        directory = Path(self.modelPath)
-        model_name = model_name if model_name else self.model_name
-        pattern = model_name + '_episode_*.keras'  # Example: all text files
-        # Get the list of files matching the pattern
-        try:
-            l = sorted(list(filter(lambda x: x.is_file(), list(Path(directory).glob(pattern)))),
-                       key=lambda x: int(x.stem.split('_')[-1]), reverse=True)
-            logger.debug(l[0:1])
-            return l[0].stem
-        except Exception as e:
-            logger.error(f'No pretrained model found: {e}')
-            raise Exception(f'No pretrained model found: {e}')
-
-        return os.path.join(self.modelPath,f"{self.model_name}.keras")
