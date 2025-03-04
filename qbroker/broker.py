@@ -645,3 +645,11 @@ class qbroker(BrokerBase): #BrokerBase
             if any(tp):
                 return 1+order.tp / 100
             return cl.Close.iloc[-1] / price
+    def getStake(self, data):
+        val = self.getvalue()
+        cash = self.get_cash()
+        stake = val + cash
+        profit = stake - self.startingcash
+        profitPercent = profit / self.startingcash
+        return dict(val=val, cash=cash, profitPercent=profitPercent,stake=stake, profit=profit,iloc=data.iloc)
+

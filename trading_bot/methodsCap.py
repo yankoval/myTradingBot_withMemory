@@ -229,5 +229,6 @@ def evaluate_model(agent, data, window_size, debug, *args, start_from: int = 1,*
                 delta = currentDealPrice - bought_price
                 delta = delta - currentDealPrice * brokerFee if brokerFee else 0
                 total_profit += delta
-            logger.info(f'total_profit{total_profit},{total_profit_} , maxDrawdownAbs{maxDrawdownAbs}')
+
+            logger.info(f'Evaluate results. grtStake: {data.broker.getStake(data)}')
             return total_profit, history, maxDrawdownAbs
