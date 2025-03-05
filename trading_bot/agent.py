@@ -77,13 +77,13 @@ class Agent:
         self.gamma = 0.98 # affinity for long term reward
         self.epsilon = epsilonInit
         self.epsilon_min = 0.1
-        self.epsilon_decay = 0.95
+        self.epsilon_decay = 0.99
         self.learning_rate = 0.0005
         self.loss = huber_loss
         self.custom_objects = {"huber_loss": huber_loss}  # important for loading the model from memory
         self.optimizer = Adam(learning_rate=self.learning_rate)
 
-        self.episode = 1
+        self.episode = 0
 
         if pretrained:
 

@@ -210,7 +210,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
     agent = Agent(window_size, strategy=strategy, pretrained=pretrained, model_name=model_name)
     # if not pretrained:
     #     agent.save(0)
-    for episode in range(agent.episode, ep_count + 1):
+    for episode in range(agent.episode+1, ep_count + 1):
         train_data.next(iloc=start_from)
         bro = qbroker(cash=1000000)
         # valBro.set_cash(1000)
