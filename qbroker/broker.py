@@ -112,7 +112,11 @@ class CommInfoBase(with_metaclass(MetaParams)):
             return price * self.p.mult
 
         return price * self.p.automargin  # int/float expected
-
+    def getCommission(self,size:int, price):
+        if self._commtype == self.COMM_PERC:
+            return self.p.commission * price * size
+        elif self._commtype == self.COMM_FIXED:
+            return self.p.commission * size
 
 class MetaBroker(MetaParams):
     def __init__(cls, name, bases, dct):
@@ -160,35 +164,6 @@ class Position():
                     if self.size > 0 and self.size + size < 0 or self.size < 0 and self.size + size > 0:
                         self.price = price
                     self.size += size
-
-                    # self.cash += (copysign(self.price,self.size) * self.price + copysign(price,size) * price) * abs(size)
-            # if size > 0: # BUY
-                #     if self.size >= 0: # Покупаем еще (Усредняем цену)
-                #         self.price = (self.size * self.price + size*price)/(self.size+size)
-                #         self.size += size
-                #         self.date = date
-                #     else: # Откупаем проданные
-                #         if abs(self.size) > size:
-                #             self.price += (self.price - price) * size/self.size # Корректируем ср. цену на профит (прибыль увеличивает ср. цену шорта)
-                #             self.size += size
-                #         else: # Откупаем все проданное и покупаем ещё. Регестрируем новую ценц.
-                #             self.size += size
-                #             self.price = price
-                #             self.date = date
-                # else: # SELL
-                #     if self.size <= 0: # Продаем еще (Усредняем цену)
-                #         self.price = (self.size * self.price + size*price)/(self.size+size)
-                #         self.size += size
-                #         self.date = date
-                #     else: # Продаем купленные ранее
-                #         if self.size > abs(size): # Продаем часть средняя цена корректируется на профит
-                #             self.price += (price - self.price) * size/self.size # Корректируем ср. цену на профит (прибыль уменьшает ср. цену лонга)
-                #             self.size += size
-                #         else:  # Продаем все купленное и ещё. Регестрируем новую ценц.
-                #             self.size += size
-                #             self.price = price
-                #             self.date = date
-                        # Теперь продаем остаток и регистрируем цену
             except Exception as e:
                 print(e)
                 raise
@@ -538,7 +513,10 @@ class qbroker(BrokerBase): #BrokerBase
         if self.kKontrol(size,price) < 0:
             return False
         self.dealsHist.append(
-            dict(iloc=self.data.iloc, price=price, type="BUY", total_profit=0, maxDrawdownAbs=0, loc=self.data.loc, ))
+            dict(iloc=self.data.iloc, price=price, type="BUY", total_profit=0, maxDrawdownAbs=0, loc=self.data.loc,
+                 commission=self.comminfo[data.tik].getCommission(size, price)
+                 ))
+        self.cash -= self.comminfo[data.tik].getCommission(size, price)
         pos = self.getposition(data)
         # Определяем часть позиции которую можно реализовать за счет своих ативов
         if pos.size < 0:
@@ -556,19 +534,8 @@ class qbroker(BrokerBase): #BrokerBase
                 self.positions[data._name].reg(price,  -1*pos.size, data.loc) # регестрируем количество
                 pos = self.getposition(data)
                 assert pos.size == 0, 'Error calculate position size when BUY'
-        # if self.cash - size * price > 0:
-            # self.cash -= size * price # Списываем деньги
         self.positions[data._name].reg(price,  size, data.loc) # регестрируем количество
         return True
-        # pos = self.getposition(data)
-        # # Подсчитываем хватит ли средств
-        # cash = self.kKontrol(size,price)
-        # if cash < 0:
-        #     return False
-        # self.positions[data._name].reg(price,size,data.loc)
-        # self.cash = cash
-        # self.dealsHist.append(dict(iloc=self.data.iloc, price=price, type="BUY", total_profit=0, maxDrawdownAbs=0,loc=self.data.loc,))
-        # return True
 
     def sell(self, owner=None, data=None, size=None, price=None, plimit='Close',
              exectype=None, valid=None, tradeid=0, oco=None,
@@ -584,44 +551,26 @@ class qbroker(BrokerBase): #BrokerBase
         if self.kKontrol(-size,price) < 0:
             return False
         self.dealsHist.append(
-            dict(iloc=self.data.iloc, price=price, type="SELL", total_profit=0, maxDrawdownAbs=0, loc=self.data.loc, ))
+            dict(iloc=self.data.iloc, price=price, type="SELL", total_profit=0, maxDrawdownAbs=0, loc=self.data.loc,
+                 commission=self.comminfo[data.tik].getCommission(size, price)
+                 ))
+        self.cash -= self.comminfo[data.tik].getCommission(size, price)
         pos = self.getposition(data)
         # Определяем часть позиции которую можно реализовать за счет своих ативов
         if pos.size > 0: # Есть что продать из своих бумаг
             if pos.size > size:
                 self.cash += size * (price - pos.price)
-                # self.cash += size * price  # Возвращаем деньги
-                # self.cash += (size * price - size * pos.price) # регестрируем фин. результат, если текущая цена меньше то прибыль
                 self.positions[data._name].reg(price, -1 * size, data.loc) # регестрируем количество
                 return True
             else:
                 self.cash += abs(pos.size) * (price - pos.price)
-                # self.cash += pos.size * price  # Возвращаем деньги
-                # self.cash += (pos.size * price - pos.size * pos.price) # регестрируем фин. результат, если текущая цена меньше то прибыль
                 size -= pos.size
                 self.positions[data._name].reg(price, -1 * pos.size, data.loc) # регестрируем количество
                 pos = self.getposition(data)
                 assert pos.size == 0, 'Error calculate position size when SELL'
-        # Теперь продаем одолженные бумаги
-        # if self.cash - size * price > 0:
-        # self.cash -= size * price # Списываем деньги
         self.positions[data._name].reg(price, -1 * size, data.loc) # регестрируем количество
         return True
-        # assert False, 'Error when doing SELL, reach end of conditions list'
 
-        #     if size > 0:
-        #     size = size - pos.size
-        #     if not size:
-        #         return True
-        # # Подсчитываем хватит ли средств
-        # cash = self.kKontrol(-size,price)
-        # if cash < 0:
-        #     return False
-        # self.positions[data._name].reg(price, -size,data.loc)
-        # self.cash = cash
-        # self.dealsHist.append(
-        #     dict(iloc=self.data.iloc, price=price, type="SELL", total_profit=0, maxDrawdownAbs=0, loc=self.data.loc, ))
-        # return True
     def calcTrade(self,data,order):
         df = data.getDf()
         if order.type == 'BUYSLTP':
