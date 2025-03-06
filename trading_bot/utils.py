@@ -175,29 +175,34 @@ def pltHist(dfin, hist, fName=None, start_from=0):
         df.iloc[i, df.columns.get_loc("portfolio")] = curCash + curPos
         df.iloc[i, df.columns.get_loc("maxDD")] = hist[-1][4]
 
-    df.index = df.index.map(str)
+    # df.index = df.index.map(str)
 
 
 
     logger.debug(f'plt begining...')
-    slotMax = df.shape[0]//1000+1
-    logger.debug(f'slotMax:{slotMax}')
-    for slot in range(slotMax):
-        day_df = df.iloc[slot * 1000+1 : (slot+1) * 1000]
+    # slotMax = df.shape[0]//1000+1
+    dRange = df.index.to_series().resample('D').last().index
+    logger.debug(f'plot {len(dRange)} days')
+    slotMax = dRange.max()
+    for  day in dRange:
+        # if not pd.isnull(day): continue
+    # for slot in range(slotMax):
+    #     day_df = df.iloc[slot * 1000+1 : (slot+1) * 1000]
+        day_df = df.loc[str(day.date())]
         if not (day_df.BUY.any() or day_df.SELL.any() ):
-            logger.debug(f'Slot:{slot} skipped due to not buying or selling.')
+            logger.debug(f'Slot:{str(day.date())} skipped due to not buying or selling.')
             continue # В периоде нет сделок
-        major_ticks = np.arange(0, day_df.shape[0], day_df.shape[0] / 5)
-        major_ticks = day_df.iloc[major_ticks].index
-        minor_ticks = np.arange(0, day_df.shape[0], day_df.shape[0] / 10)
-        minor_ticks = day_df.iloc[minor_ticks].index
-
-        dRange = day_df.High.max() - day_df.Low.min()
-        major_ticks_y = np.arange(day_df.Low.min(), day_df.High.max(), dRange / 6)
-        minor_ticks_y = np.arange(day_df.Low.min(), day_df.High.max(), dRange / 12)
+        # major_ticks = np.arange(0, day_df.shape[0], day_df.shape[0] / 5)
+        # major_ticks = day_df.iloc[major_ticks].index
+        # minor_ticks = np.arange(0, day_df.shape[0], day_df.shape[0] / 10)
+        # minor_ticks = day_df.iloc[minor_ticks].index
+        #
+        # dRange = day_df.High.max() - day_df.Low.min()
+        # major_ticks_y = np.arange(day_df.Low.min(), day_df.High.max(), dRange / 6)
+        # minor_ticks_y = np.arange(day_df.Low.min(), day_df.High.max(), dRange / 12)
         try:
             fig, (ax0, ax1, axmdd, axProb, axCash, axValue, ax2) = plt.subplots(7, 1, sharex=True, gridspec_kw={
-                'height_ratios': [3, 3, 3, 3, 3, 1, 6]}
+                'height_ratios': [3, 3, 3, 3, 3, 3, 9]}
                                                                                 , figsize=(day_df.shape[0] // 15, 12))
             logger.debug('plt started plt.subplots')
             ax0.plot(day_df.index, day_df.total_profit)
@@ -243,10 +248,10 @@ def pltHist(dfin, hist, fName=None, start_from=0):
             # plot levels if calculted
             if 'nLevel' in day_df.columns:
                 ax2.plot(day_df.nLevel,color='red',label='nearest level')
-            ax2.set_xticks(major_ticks)
-            ax2.set_xticks(minor_ticks, minor=True)
-            ax2.set_yticks(major_ticks_y)
-            ax2.set_yticks(minor_ticks_y, minor=True)
+            # ax2.set_xticks(major_ticks)
+            # ax2.set_xticks(minor_ticks, minor=True)
+            # ax2.set_yticks(major_ticks_y)
+            # ax2.set_yticks(minor_ticks_y, minor=True)
 
             # And a corresponding grid
             ax2.grid(which='both')
@@ -254,7 +259,8 @@ def pltHist(dfin, hist, fName=None, start_from=0):
             # Or if you want different settings for the grids:
             ax2.text(0.01, 0.9, fName, transform=ax2.transAxes)  # ,day_df.High.max()-dRange/10
             startStake = day_df.cash.iloc[0] + day_df.total_profit.iloc[0]
-            endStake = day_df.cash.iloc[-1] + day_df.total_profit.iloc[-1]
+            endStake = day_df.cash.iloc[-1] + day_df.total_profit.loc[day_df.total_profit.last_valid_index()]
+            #data.df.Close.loc[data.df.Volume.last_valid_index()]
             ax0.text(0.01, 0.9,
                      f'portfolio, max:{day_df.total_profit.max():0.2f}, '
                      f'start:{startStake:0.2f}'
@@ -267,7 +273,7 @@ def pltHist(dfin, hist, fName=None, start_from=0):
                        transform=axmdd.transAxes)
 
             if fName:
-                plt.savefig(Path.cwd() / 'graphs' / (fName+f'_slot_{slot}in{slotMax}.jpg'),dpi=300)
+                plt.savefig(Path.cwd() / 'graphs' / (fName+f'_day_{str(day.date())}_in_{len(dRange)}.jpg'),dpi=300)
         except Exception as e:
             logger.error(f'pltHist error:{str(e)}, {traceback.format_exc()}')
 
@@ -441,7 +447,7 @@ def readData(stock_file: str, dataPath: str, *agrs, tfCounts=None, tik=None, tFr
 def readFinam(tik, dataPath: str, *agrs, tFrame='daily', dFrom=None, dTo=None, skiprows=range(1, 1), nrows=None,
               **kwargs):
     """ read from local db or from moex"""
-    tFrame = {'min': '1', 'daily': '24', 'hourly': '60', 'minute': '1', 'monthly': 31, 'weekly': '7'}[tFrame]
+    tFrame = {'min': '1','10min': '10','10': '10', 'daily': '24', 'hourly': '60', 'minute': '1', 'monthly': 31, 'weekly': '7'}[tFrame]
     df = pd.DataFrame()
     # Load data page by pege till got empty data
     for timeout in range(100):

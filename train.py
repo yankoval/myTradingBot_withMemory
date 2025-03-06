@@ -36,7 +36,7 @@ Options:
   --dTo=<dTo>                       filter to Date default None 
   --vdFrom=<vdFrom>                 validate  filter from Date default None 
   --vdTo=<vdTo>                     validate  filter to Date default None 
-  --start_from=<start_from>         Starting train index  [default: 0]
+  --start_from=<start_from>         Starting train index  [default: "0"]
   --trStrat=<trStrat>               trade strategy long, short or both  [default: long]
   --trainId=<trainId>               randomId of train filename suffix  [default: 0]
   --dataPath=<dataPath>             dataPath to DATASETs DB    [default: data]
@@ -63,6 +63,25 @@ Broker fee (Finam)
 0,00944 % 
 
 Не менее 41,3 ₽ за исполненное поручение
+
+--trStrat=Long
+--tik=MXZ4
+--strategy=t-dqn
+--window-size=15
+--batch-size=32
+--episode-count=50
+--tFrame=min
+--dFrom=2024.09.30
+--dTo=2024.12.04
+--vdFrom=2024.08.01
+--vdTo=2024.10.30
+--start_from=35000
+--trainId=778
+--debug
+--dataClass=DataV303
+--agentClass=AgentF
+--pretrained
+
 """
 import logging
 import logging.config
@@ -159,12 +178,15 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
             logger.error('Train dataset is empty after preparation.')
             return (-1)
         logger.info(
-            f'Train data shape:{train_data.df.shape}, from:{train_data.df.iloc[0].name}, to:{train_data.df.index[-1]}.')
+            f'Train data shape:{train_data.df.shape},'
+             f' from:{train_data.df.index[0]}, start_from:{start_from},'
+            f' to:{train_data.df.index[-1]}.')
     # val_dataOHLCV = readData(val_stock, dataPath, tfCounts=tfCounts, tik=tik, tFrame=tFrame, dFrom=vdFrom, dTo=vdTo)
     val_dataOHLCV = Data(val_stock if val_stock else dataPath, tfCounts=tfCounts, tik=tik, tFrame=tFrame, dFrom=vdFrom,
                dTo=vdTo,window_size=window_size,start_from=start_from,)
-    logger.info(f'Validation data data shape:{val_dataOHLCV.df.shape}, tfCounts: {tfCounts}, from:{val_dataOHLCV.df.index[0]} '
-                f'to:{val_dataOHLCV.df.index[-1]}.')
+    logger.info(f'Validation data data shape:{val_dataOHLCV.df.shape}, '
+                f' from:{val_dataOHLCV.df.index[0]}, start_from:{start_from},'
+                f' to:{val_dataOHLCV.df.index[-1]}.')
     assert val_dataOHLCV.df.shape[0] > 800 , f'Shape:{val_dataOHLCV.df.shape} < 800.'
     if val_dataOHLCV.df.empty:
         logger.error('Validate dataset is empty.') #8988 623 30 01 марг мих 370
@@ -185,7 +207,9 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
                     logger.error(f'window size parameter not match to loadad model. Set window size from loaded model!')
                     return (-1)
                     # window_size = agent.state_size
+                start_from = start_from if type(start_from) is int else val_dataOHLCV.df.index.get_loc(start_from).start
                 val_dataOHLCV.next(iloc=start_from)
+
                 valBro = qbroker(cash=1000000)
                 # valBro.set_cash(1000)
                 valBro.setcommission(commission=0.0001, name=tik)
@@ -211,9 +235,9 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
     # if not pretrained:
     #     agent.save(0)
     for episode in range(agent.episode+1, ep_count + 1):
+        start_from = start_from if type(start_from) is int else val_dataOHLCV.df.index.get_loc(start_from).start
         train_data.next(iloc=start_from)
         bro = qbroker(cash=1000000)
-        # valBro.set_cash(1000)
         bro.setcommission(commission=0.0001, name=tik)
         train_data.setBroker(bro)
         sizer = AllInSizer()
@@ -226,9 +250,11 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
                                    broker_fee=0.0001
                                    )
         try:
-            val_dataOHLCV.next(iloc=start_from)
+            if type(start_from) is int:
+                val_dataOHLCV.next(iloc=start_from)
+            else:
+                val_dataOHLCV.next(loc=start_from)
             valBro = qbroker(cash=1000000)
-            # valBro.set_cash(1000)
             valBro.setcommission(commission=0.0001, name=tik)
             val_dataOHLCV.setBroker(valBro)
             sizer = AllInSizer()
@@ -270,7 +296,7 @@ if __name__ == "__main__":
     dTo = args["--dTo"]
     vdFrom = args["--vdFrom"]
     vdTo = args["--vdTo"]
-    start_from = int(args["--start_from"])
+    start_from = args["--start_from"]
     trStrat = args["--trStrat"]
     trainId = args["--trainId"]
     dataPath = args["--dataPath"]
