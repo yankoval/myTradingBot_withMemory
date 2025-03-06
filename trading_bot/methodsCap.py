@@ -214,10 +214,12 @@ def evaluate_model(agent, data, window_size, debug, *args, start_from: int = 1,*
         data.df.at[data.loc, 'reward_'] = reward
 
         if round(abs(total_profit - (total_profit_ + profit)),2)> 0:
-            logger.error('broker profit value error')
+            pass
+            # logger.error('broker profit value error')
         if pos != bro.getposition().size:
             logger.error('broker profit qty error')
-
+        if t // 10 ==0:
+            logger.debug(f'Current state for step {t} is {data.broker.getStake(data)}')
         done = (t == data_length - 3)
         # agent.memory.append((state, action, reward, next_state, done))
 
