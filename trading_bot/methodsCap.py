@@ -185,7 +185,8 @@ def evaluate_model(agent, data, window_size, debug, *args, start_from=1, **kwarg
         elif action == 0 and len(agent.inventory) > 0:
             delta = 0
             total_profit_, profit, pos, reward = data.getProfit(agent, t)
-            logger.info(f'total_profit_:{total_profit_}, profit:{profit}, pos:{pos}, reward:{reward},')
+            if debug:
+                logger.info(f'total_profit_:{total_profit_}, profit:{profit}, pos:{pos}, reward:{reward},')
             total_profit = bro.get_cash() + bro.getvalue(data) - bro.startingcash
             # maxDrawdownAbs = maxDrawdownAbs if total_profit+delta > maxDrawdownAbs else total_profit+delta
             maxDrawdownAbs = maxDrawdownAbs if total_profit > maxDrawdownAbs else total_profit

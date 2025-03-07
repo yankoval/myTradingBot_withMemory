@@ -207,8 +207,11 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
                     logger.error(f'window size parameter not match to loadad model. Set window size from loaded model!')
                     return (-1)
                     # window_size = agent.state_size
-                start_from = start_from if type(start_from) is not str else val_dataOHLCV.df.index.get_loc(start_from).start
-                val_dataOHLCV.next(iloc=start_from)
+                if type(start_from) is not str:
+                    val_dataOHLCV.next(iloc=start_from)
+                else:
+                    val_dataOHLCV.next(loc=start_from)
+                start_from = val_dataOHLCV.iloc
 
                 valBro = qbroker(cash=1000000)
                 # valBro.set_cash(1000)
@@ -218,7 +221,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
                 val_dataOHLCV.setsizer(sizer)
 
                 val_result, history, maxDrawdownAbs = evaluate_model(agent, val_dataOHLCV, window_size, debug
-                                                                     ,start_from=start_from,
+                                                                     ,start_from=val_dataOHLCV.iloc,
                                                                      logger=logger)
                 show_train_result((1,2,3,4), val_result, initial_offset, history=history, data=val_dataOHLCV
                                   ,maxDrawdownAbs=maxDrawdownAbs,modelName=model_name+'_'+str(i), start_from=start_from
@@ -231,12 +234,16 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
 
 
     # Train model
-    start_from = start_from if type(start_from) is not str else train_data.df.index.get_loc(start_from).start
+    # start_from = start_from if type(start_from) is not str else train_data.df.index.get_loc(start_from).start
     agent = Agent(window_size, strategy=strategy, pretrained=pretrained, model_name=model_name)
     # if not pretrained:
     #     agent.save(0)
     for episode in range(agent.episode+1, ep_count + 1):
-        train_data.next(iloc=start_from)
+        if type(start_from) is not str:
+            train_data.next(iloc=start_from)
+        else:
+            train_data.next(loc=start_from)
+        # start_from = val_dataOHLCV.iloc
         bro = qbroker(cash=1000000)
         bro.setcommission(commission=0.0001, name=tik)
         train_data.setBroker(bro)
@@ -246,11 +253,11 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
                                    batch_size=batch_size, window_size=window_size,
                                    reward_func='calcRewardLine',
                                    tr_strat=trStrat,
-                                   start_from=start_from,
+                                   start_from=train_data.iloc,
                                    broker_fee=0.0001
                                    )
         try:
-            if type(start_from) is int:
+            if type(start_from) is not str:
                 val_dataOHLCV.next(iloc=start_from)
             else:
                 val_dataOHLCV.next(loc=start_from)
@@ -263,7 +270,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
             val_result, history, maxDrawdownAbs = evaluate_model(agent, val_dataOHLCV, window_size
                                                                  , debug
                                                                  , logger=logger
-                                                                 , start_from=start_from
+                                                                 , start_from=val_dataOHLCV.iloc
                                                                  #, brokerFee=0.001
                                                                  )
             with open(f'{(log_dir / (model_name + (f"_episode_{ep_count}" )))}.hist','w') as f:

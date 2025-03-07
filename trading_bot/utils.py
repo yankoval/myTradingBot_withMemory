@@ -386,8 +386,13 @@ class Data:
         if loc:
             try:
                 iloc = self.df.index.get_loc(loc)
-                self.loc = loc
-                self.iloc = iloc
+                if type(iloc) is  int:
+                    self.iloc = iloc
+                elif type(iloc) is slice:
+                    self.iloc = iloc.start
+                else:
+                    raise IndexError
+                self.loc = self.df.index[self.iloc]
                 return
             except KeyError:
                 self.loc = self.df.index[self.df.index <= loc].max()
