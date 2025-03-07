@@ -384,11 +384,15 @@ class Data:
 
     def next(self, loc=None, iloc=None):
         if loc:
-            self.loc = loc
-            iloc = self.df.index.get_loc(self.loc)
-            # assert iloc >= self.iloc
-            self.iloc = iloc
-            return
+            try:
+                iloc = self.df.index.get_loc(loc)
+                self.loc = loc
+                self.iloc = iloc
+                return
+            except KeyError:
+                self.loc = self.df.index[self.df.index <= loc].max()
+                self.iloc = self.df.index.get_loc(self.loc)
+                return
         if iloc:
             # assert iloc >= self.iloc
             self.iloc = iloc

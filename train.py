@@ -207,7 +207,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
                     logger.error(f'window size parameter not match to loadad model. Set window size from loaded model!')
                     return (-1)
                     # window_size = agent.state_size
-                start_from = start_from if type(start_from) is int else val_dataOHLCV.df.index.get_loc(start_from).start
+                start_from = start_from if type(start_from) is not str else val_dataOHLCV.df.index.get_loc(start_from).start
                 val_dataOHLCV.next(iloc=start_from)
 
                 valBro = qbroker(cash=1000000)
@@ -231,11 +231,11 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
 
 
     # Train model
+    start_from = start_from if type(start_from) is not str else train_data.df.index.get_loc(start_from).start
     agent = Agent(window_size, strategy=strategy, pretrained=pretrained, model_name=model_name)
     # if not pretrained:
     #     agent.save(0)
     for episode in range(agent.episode+1, ep_count + 1):
-        start_from = start_from if type(start_from) is int else val_dataOHLCV.df.index.get_loc(start_from).start
         train_data.next(iloc=start_from)
         bro = qbroker(cash=1000000)
         bro.setcommission(commission=0.0001, name=tik)
