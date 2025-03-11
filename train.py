@@ -31,7 +31,7 @@ Options:
   --log_dir=<log_dir>               logging folder
   --tfCounts=<tf-Counts>            How math rows to get from data source [default: 0]
   --tik=<tiker>                     Tiker from Finam DB default None (read from CSV)
-  --tFrame=<tFrame>                 Time frame (daily,hourly,minute,monthly,weekly) [default: daily]
+  --tFrame=<tFrame>                 Time frame pandas Offset aliases (1D,1h,5min,31D,1W) https://pandas.pydata.org/docs/user_guide/timeseries.html#offset-aliases [default: D]
   --dFrom=<dFrom>                   filter from Date default None 
   --dTo=<dTo>                       filter to Date default None 
   --vdFrom=<vdFrom>                 validate  filter from Date default None 
