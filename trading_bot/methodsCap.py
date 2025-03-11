@@ -129,6 +129,7 @@ def evaluate_model(agent, data, window_size, debug, *args, start_from=1, **kwarg
     brokerFee = data.broker.getcommissioninfo(data)
     brokerFee = brokerFee.p.commission
     data.next(iloc=start_from)
+    logger.info(f'Starting evaluation from {start_from}/{data.loc}')
     for t in tqdm(range(start_from + 1, data_length - 2), leave=True,
                   desc=f'Evaluate model, episode {start_from}/{data_length - 2}.'):
         data.next()
@@ -229,5 +230,5 @@ def evaluate_model(agent, data, window_size, debug, *args, start_from=1, **kwarg
                 delta = delta - currentDealPrice * brokerFee if brokerFee else 0
                 total_profit += delta
 
-            logger.info(f'Evaluate results. grtStake: {data.broker.getStake(data)}')
+            logger.info(f'Evaluate results. periods:{t}/{data.loc}, getStake: {data.broker.getStake(data)}')
             return total_profit, history, maxDrawdownAbs

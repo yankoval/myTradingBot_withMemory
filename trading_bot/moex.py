@@ -22,15 +22,32 @@ import requests
 import pandas as pd
 import json
 from datetime import datetime, date, timedelta
+import logging
+
+logger = logging.getLogger(__name__)
 
 apiKey = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJaVHA2Tjg1ekE4YTBFVDZ5SFBTajJ2V0ZldzNOc2xiSVR2bnVaYWlSNS1NIn0.eyJleHAiOjE3MzQ4NzY0MTMsImlhdCI6MTczMjI4NDQxMywiYXV0aF90aW1lIjoxNzMyMjg0MDE0LCJqdGkiOiIyNmUwZjczNS02ODA1LTQ2OWQtOGQzZi00N2VkMGRhZmZkNjIiLCJpc3MiOiJodHRwczovL3NzbzIubW9leC5jb20vYXV0aC9yZWFsbXMvY3JhbWwiLCJhdWQiOlsiYWNjb3VudCIsImlzcyJdLCJzdWIiOiJmOjBiYTZhOGYwLWMzOGEtNDlkNi1iYTBlLTg1NmYxZmU0YmY3ZTozNmE1ZTczZS05OTViLTRiNTUtOWVlMS0zMmE5NGM3NTljZDUiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJpc3MiLCJzZXNzaW9uX3N0YXRlIjoiYjBjOTdjYWUtNjVhMi00ODUyLTg4OTEtZTVmNDg2ZDAyNGU4IiwiYWNyIjoiMSIsImFsbG93ZWQtb3JpZ2lucyI6WyIvKiJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJ2aWV3LXByb2ZpbGUiXX19LCJzY29wZSI6Im9wZW5pZCBvZmZsaW5lX2FjY2VzcyBpc3NfYWxnb3BhY2sgcHJvZmlsZSBlbWFpbCIsInNpZCI6ImIwYzk3Y2FlLTY1YTItNDg1Mi04ODkxLWU1ZjQ4NmQwMjRlOCIsImVtYWlsX3ZlcmlmaWVkIjpmYWxzZSwiaXNzX3Blcm1pc3Npb25zIjoiMTM3LCAxMzgsIDEzOSwgMTQwLCAxNjUsIDE2NiwgMTY3LCAxNjgsIDMyOSwgNDIxIiwibmFtZSI6ItCY0LLQsNC9INCa0LjRgdC10LvRkdCyIiwicHJlZmVycmVkX3VzZXJuYW1lIjoiMzZhNWU3M2UtOTk1Yi00YjU1LTllZTEtMzJhOTRjNzU5Y2Q1IiwiZ2l2ZW5fbmFtZSI6ItCY0LLQsNC9IiwiZmFtaWx5X25hbWUiOiLQmtC40YHQtdC70ZHQsiJ9.iwQXQrn6tU1R5Ek1HS_ccNiKNuTPs8toPkjjvxDN2OTvIU2kzUamsRYfrXMwmyRmFSvpByWc0E_1-uhzRuak0RsXJ9xKogCQGKiNEbBf7ELDA45FcQM56hhWOrMIYNDC57Gbi-stTELzMGmBijg5tt2vMn4q9VKaLoYMJJ3yuzgTnWz1VqpKCSAGYokT1k-17eQYSFpWPdR61G09-Nezy7P01XPGDuket0-9o5eUar15x07bwWrulB8VXZrAcQ7Z75XM5qJyUSXgtdenCHgmXV3b5WzfAoNrL5AXvutzk5YtyJEFpyi3oOUIjTXTuZGtPfB-DrXmtlpo7Ydm1O3QQw'
 baseUrl = 'https://iss.moex.com/iss'
-
+intervalDict = {'1':pd.Timedelta('1min'),
+                '10':pd.Timedelta('10min'),
+                '60':pd.Timedelta('1h'),
+                '24':pd.Timedelta('1D'),
+                '7':pd.Timedelta('1W'),
+                '31':pd.Timedelta('31D'),}
+def convertInterval(interval):
+    if interval in intervalDict.keys():
+        return interval
+    try:
+        return [k for k,v in intervalDict.items() if v == pd.Timedelta(interval)][0]
+    except Exception as e:
+        logger.error(f'Wrong time interval {interval}')
+        raise e
 def loadCandlesPage(sec:str= 'SBER', dateFrom:date=None, dateTo:date =None, interval='60', start='0'):
     # load data in iss.moex.com format, sec = 'SBER', interval in ['1','10','60','24','7','31']
     dateFrom = date.today() - timedelta(days=1) if dateFrom is None else dateFrom
     dateTo = dateFrom + timedelta(days=1) if dateTo is None else dateTo
     engines, markets, boards = 'futures', 'forts', 'rfud'
+    interval = convertInterval(interval)
     assert  interval in ['1','10','60','24','7','31'] # Check interval
     # print(dateFrom,dateTo)
     apiKey = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJaVHA2Tjg1ekE4YTBFVDZ5SFBTajJ2V0ZldzNOc2xiSVR2bnVaYWlSNS1NIn0.eyJleHAiOjE3MzQ4NzY0MTMsImlhdCI6MTczMjI4NDQxMywiYXV0aF90aW1lIjoxNzMyMjg0MDE0LCJqdGkiOiIyNmUwZjczNS02ODA1LTQ2OWQtOGQzZi00N2VkMGRhZmZkNjIiLCJpc3MiOiJodHRwczovL3NzbzIubW9leC5jb20vYXV0aC9yZWFsbXMvY3JhbWwiLCJhdWQiOlsiYWNjb3VudCIsImlzcyJdLCJzdWIiOiJmOjBiYTZhOGYwLWMzOGEtNDlkNi1iYTBlLTg1NmYxZmU0YmY3ZTozNmE1ZTczZS05OTViLTRiNTUtOWVlMS0zMmE5NGM3NTljZDUiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJpc3MiLCJzZXNzaW9uX3N0YXRlIjoiYjBjOTdjYWUtNjVhMi00ODUyLTg4OTEtZTVmNDg2ZDAyNGU4IiwiYWNyIjoiMSIsImFsbG93ZWQtb3JpZ2lucyI6WyIvKiJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJ2aWV3LXByb2ZpbGUiXX19LCJzY29wZSI6Im9wZW5pZCBvZmZsaW5lX2FjY2VzcyBpc3NfYWxnb3BhY2sgcHJvZmlsZSBlbWFpbCIsInNpZCI6ImIwYzk3Y2FlLTY1YTItNDg1Mi04ODkxLWU1ZjQ4NmQwMjRlOCIsImVtYWlsX3ZlcmlmaWVkIjpmYWxzZSwiaXNzX3Blcm1pc3Npb25zIjoiMTM3LCAxMzgsIDEzOSwgMTQwLCAxNjUsIDE2NiwgMTY3LCAxNjgsIDMyOSwgNDIxIiwibmFtZSI6ItCY0LLQsNC9INCa0LjRgdC10LvRkdCyIiwicHJlZmVycmVkX3VzZXJuYW1lIjoiMzZhNWU3M2UtOTk1Yi00YjU1LTllZTEtMzJhOTRjNzU5Y2Q1IiwiZ2l2ZW5fbmFtZSI6ItCY0LLQsNC9IiwiZmFtaWx5X25hbWUiOiLQmtC40YHQtdC70ZHQsiJ9.iwQXQrn6tU1R5Ek1HS_ccNiKNuTPs8toPkjjvxDN2OTvIU2kzUamsRYfrXMwmyRmFSvpByWc0E_1-uhzRuak0RsXJ9xKogCQGKiNEbBf7ELDA45FcQM56hhWOrMIYNDC57Gbi-stTELzMGmBijg5tt2vMn4q9VKaLoYMJJ3yuzgTnWz1VqpKCSAGYokT1k-17eQYSFpWPdR61G09-Nezy7P01XPGDuket0-9o5eUar15x07bwWrulB8VXZrAcQ7Z75XM5qJyUSXgtdenCHgmXV3b5WzfAoNrL5AXvutzk5YtyJEFpyi3oOUIjTXTuZGtPfB-DrXmtlpo7Ydm1O3QQw'

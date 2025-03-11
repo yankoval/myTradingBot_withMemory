@@ -85,7 +85,10 @@ def calcLevels(df, kMeansKwargs={"init": "k-means++", "n_init": 4, "n_clusters":
     epsLev0, epsLev1 = 800, 0.03  # 0.039
     fh = df.loc[df.fHigh == True].High.values
     fl = df.loc[df.fLow == True].Low.values
-    # levels = []
+    minKlasters = min(len(fh), len(fl))
+    kMeansKwargs = kMeansKwargs
+    if kMeansKwargs.get("n_clusters",0) > minKlasters:
+        kMeansKwargs.update({'n_clusters': minKlasters})
 
     # Keans
     kmeans = KMeans(**kMeansKwargs)  # , n_clusters=20, n_init=4
@@ -347,6 +350,12 @@ class Data:
     def __init__(self, *args, **kwargs):
         self.tik = self._name = kwargs.get('tik')
         self.start_from = kwargs.get('start_from',Data.indexStartPos)
+        self.freq = kwargs.get('tFrame')
+        try:
+            freq = pd.tseries.frequencies.to_offset(self.freq)
+        except ValueError:
+            logger.error(f'self.freq is wrong pd offset alias:"{kwargs.get("tFrame")}"')
+            raise ValueError
         if args:
             if args[0] and Path(args[0]).is_file():
                 self.df = readData(args[0], None, *args[1:], **kwargs)
@@ -396,6 +405,7 @@ class Data:
                 return
             except KeyError:
                 self.loc = self.df.index[self.df.index <= loc].max()
+                assert self.loc is not pd.NaT , f' param sart_from:{loc} not found in index'
                 self.iloc = self.df.index.get_loc(self.loc)
                 return
         if iloc:
@@ -453,17 +463,21 @@ def readData(stock_file: str, dataPath: str, *agrs, tfCounts=None, tik=None, tFr
     return df
 
 
-def readFinam(tik, dataPath: str, *agrs, tFrame='daily', dFrom=None, dTo=None, skiprows=range(1, 1), nrows=None,
-              **kwargs):
-    """ read from local db or from moex"""
-    tFrame = {'min': '1','10min': '10','10': '10', 'daily': '24', 'hourly': '60', 'minute': '1', 'monthly': 31, 'weekly': '7'}[tFrame]
+def readFinam(tik, *agrs, tFrame='D', dFrom=None, dTo=None, **kwargs):
+    """ read from moex api.
+    return pandas dataframe in OHLCV format
+    tik is tiker like SBER or MXZ4,
+    tFrame is pandas freq or moex interval string
+    dFrom and dTo is string like 2024.12.31
+    """
+    # tFrame = {'min': '1','10min': '10','10': '10', 'daily': '24', 'hourly': '60', 'minute': '1', 'monthly': 31, 'weekly': '7'}[tFrame]
     df = pd.DataFrame()
     # Load data page by pege till got empty data
     for timeout in range(100):
         logger.debug(f'df.shape{df.shape}, {df.index.max()}')
         dfTmp = candles(sec=tik, interval=tFrame,
-                        dateFrom=parser.parse(dFrom),  #datetime.now() - timedelta(days=days),
-                        dateTo=parser.parse(dTo),  #datetime.now() + timedelta(days=1),
+                        dateFrom=parser.parse(dFrom),
+                        dateTo=parser.parse(dTo),
                         start=str(df.shape[0])
                         )
         if dfTmp.shape[0] == 0:  # chek df is empty then exit
@@ -480,16 +494,6 @@ def readFinam(tik, dataPath: str, *agrs, tFrame='daily', dFrom=None, dTo=None, s
     # We need df with standart OHLCV columns only
     df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
     return df
-    # dataPath = Path(dataPath) #if dataPath else Path(r'D:/share/finam/data/')
-    # return pd.read_csv(Path(dataPath, tik, tFrame, (tik + '.csv'))
-    #                    , *agrs
-    #                    , index_col=['Date']
-    #                    , parse_dates=['Date']
-    #                    , skiprows=skiprows
-    #                    , nrows=nrows
-    #                    , **kwargs
-    #                    ).loc[dFrom:dTo]
-
 
 def prepareData(df):
     return list(df['Close'])
@@ -671,10 +675,11 @@ class DataV302(Data3):
     description = Data3.description + ' Fractal difference(ver2)  normalised by ATR.'
     expK = 0.001
     def _prepareDf(self,*args, **kwargs):
-        super()._prepareDf(*args, **kwargs)
+        super(Data3,self)._prepareDf(*args, **kwargs)
         calculateFractalsPairs(self.df)
         self.fractalsValues = getStateFractalsValues(self.df)
-        self.dfLevels = calcLevelsForEachInterval(self.df)
+        self.dfLevels = calcLevelsForEachInterval(self.df, duration= '60D' if
+            pd.tseries.frequencies.to_offset(self.freq) > pd.Timedelta('5min') else '30D')
         self.df['nLevel'] = np.nan
         for idx, row in self.df.iterrows():
             try:
@@ -686,10 +691,6 @@ class DataV302(Data3):
             [self.fractalsValues.loc[self.fractalsValues.index <=idx].iloc[-self.window_size + 2:].Close.values
              - row.nLevel for idx, row in self.df.iterrows()
              ], index=self.df.index)
-        # = pd.DataFrame(index=self.df.index, columns=pd.RangeIndex(start=0, stop=(self.window_size - 2), step=1))
-        # for tIdx, row in self.df.iterrows():
-        #     for cIdx, lRow in enumerate(self.fractalsValues.Close.loc[self.fractalsValues.index <= tIdx].iloc[-self.window_size + 2:] - row.nLevel):
-        #         self.dff.at[tIdx, cIdx] = lRow
 
         # normalise by ATR mean
         #^todo: normalise by rolling window ATR mean

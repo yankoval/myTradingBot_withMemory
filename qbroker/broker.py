@@ -298,7 +298,11 @@ class BrokerBase(with_metaclass(MetaBroker, object)): #with_metaclass(MetaBroker
         # called from init and from start
         if None not in self.comminfo:
             self.comminfo = dict({None: self.params.commission})
-
+        # stat init
+        self.maxDrawDown = 0
+    def statUpdate(self):
+        profit = self.getvalue() + self.getcash() - self.startingcash
+        self.maxDrawDown = profit if profit < self.maxDrawDown else self.maxDrawDown
     def start(self):
         self.init()
 
@@ -415,6 +419,7 @@ class BrokerBase(with_metaclass(MetaBroker, object)): #with_metaclass(MetaBroker
         raise NotImplementedError
 
     def next(self):
+        self.statUpdate()
         pass
 
 # __all__ = ['BrokerBase', 'fillers', 'filler']

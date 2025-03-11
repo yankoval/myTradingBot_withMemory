@@ -276,8 +276,12 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
             with open(f'{(log_dir / (model_name + (f"_episode_{ep_count}" )))}.hist','w') as f:
                 for h in history:
                     f.write(str(h))
+            if type(start_from) is not str:
+                val_dataOHLCV.next(iloc=start_from)
+            else:
+                val_dataOHLCV.next(loc=start_from)
             show_train_result(train_result, val_result, initial_offset, history=history, data=val_dataOHLCV
-                              , modelName=model_name, maxDrawdownAbs=maxDrawdownAbs, start_from=start_from)
+                              , modelName=model_name, maxDrawdownAbs=maxDrawdownAbs, start_from=val_dataOHLCV.iloc)
         except Exception as e:
             logger.error(f'evaluate_model: {e}, {traceback.format_exc()}')
             # print(traceback.print_exc())
