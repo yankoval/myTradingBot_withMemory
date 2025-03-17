@@ -301,6 +301,9 @@ class BrokerBase(with_metaclass(MetaBroker, object)): #with_metaclass(MetaBroker
         # stat init
         self.maxDrawDown = 0
     def statUpdate(self):
+        """ update stat maxDd,..."""
+        # maxDD
+        # self.__dict__.update({'maxDDStakeLastMax':)
         profit = self.getvalue() + self.getcash() - self.startingcash
         self.maxDrawDown = profit if profit < self.maxDrawDown else self.maxDrawDown
     def start(self):

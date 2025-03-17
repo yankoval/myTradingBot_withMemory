@@ -206,7 +206,8 @@ def pltHist(dfin, hist, fName=None, start_from=0):
         try:
             fig, (ax0, ax1, axmdd, axProb, axCash, axValue, ax2) = plt.subplots(7, 1, sharex=True, gridspec_kw={
                 'height_ratios': [3, 3, 3, 3, 3, 3, 9]}
-                                                                                , figsize=(day_df.shape[0] // 15, 12))
+                , figsize=(day_df.shape[0] // 15 if day_df.shape[0] // 15 > 10 else 10, 12)
+                                                                                )
             logger.debug('plt started plt.subplots')
             ax0.plot(day_df.index, day_df.total_profit)
             plt.setp(ax0.get_xticklabels(), visible=False)

@@ -93,7 +93,7 @@ from docopt import docopt
 from pathlib import Path
 from trading_bot.utils import show_train_result
 from qbroker.broker import qbroker, AllInSizer
-
+import gc
 
 def main(train_stock, val_stock, window_size, batch_size, ep_count
          ,strategy="t-dqn", model_name="model_debug"
@@ -239,6 +239,7 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
     # if not pretrained:
     #     agent.save(0)
     for episode in range(agent.episode+1, ep_count + 1):
+        gc.collect()
         if type(start_from) is not str:
             train_data.next(iloc=start_from)
         else:
