@@ -13,10 +13,11 @@ from .ops import (
     calcRewardLineSigmoid
 )
 
+from pathlib import Path
 import logging
 
 logger = logging.getLogger(__name__)
-
+pass
 
 # TODO: Create universal broker object to do standard Buy Sell SL TP Profit calc
 # TODO: Create and test model based on standard actions: "Enter with SL" and "Wait" to speed up training
@@ -30,7 +31,8 @@ logger = logging.getLogger(__name__)
 def train_model(agent, data, *args, episode=None, ep_count=100, batch_size=32, window_size=10, reward_func=None,
                 tr_strat='Long',
                 get_state=get_state3, data_ohlcv_=None, broker_fee=None, start_from:int=0, **kwargs):
-    logger.debug(f'train_model: {locals()}')
+    logger = logging.getLogger(__name__)
+    logger.debug(f'Starting train_model: {agent.model_name}, start with episode:{episode}.')
     agent.episode = episode if episode else agent.episode
     size = kwargs.get('size', DEFAULT_SIZE)
     if callable(reward_func):
@@ -52,6 +54,7 @@ def train_model(agent, data, *args, episode=None, ep_count=100, batch_size=32, w
     # total=data_length,
     for t in tqdm(range(start_from, data_length - 2), leave=True,
                   desc='Episode {}/{} epsilon:{}'.format(episode, ep_count, agent.epsilon)):
+        # logger.debug(f'Starting episode:{episode}, model: {agent.model_name}.')
         reward = 0
         lastDealPrice = data.df.Close.iloc[t]
         stake = data.df.Close.iloc[start_from]
@@ -89,7 +92,7 @@ def train_model(agent, data, *args, episode=None, ep_count=100, batch_size=32, w
     agent.episode += 1
     if episode % 1 == 0:
         agent.save(episode)
-        logger.info(f'Episode {episode} saved')
+        logger.info(f'Episode {episode} saved, model:{agent.model_name}.')
     logger.info(f'Total profit: {total_profit}, episode: {episode}')
     return (episode, ep_count, total_profit, np.mean(np.array(avg_loss)))
 

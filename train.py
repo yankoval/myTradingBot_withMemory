@@ -87,10 +87,15 @@ import logging
 import logging.config
 import coloredlogs
 import traceback
+from pathlib import Path
+
+# prepare logger config
+logging.config.fileConfig(Path('logging.conf').absolute(), disable_existing_loggers=False)
+logger = logging.getLogger('main')
 
 from docopt import docopt
 
-from pathlib import Path
+
 from trading_bot.utils import show_train_result
 from qbroker.broker import qbroker, AllInSizer
 import gc
@@ -132,9 +137,6 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
     qt_v08 - based on qt_v07, Model with 6 layers
 
     """
-    # Create a logger object.
-    logging.config.fileConfig(Path('logging.conf').absolute(), disable_existing_loggers=False)
-    logger = logging.getLogger(__name__)
 
     # import dynamic classes
     import importlib
@@ -144,19 +146,19 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
     if model_name in ['model_debug',None]:
         model_name = f'qt_v09_{strategy}_{trStrat}_{window_size}_{batch_size}_{tik}_{tFrame}_Agent_{agentClass}_Data_{dataClass}'
 
-    coloredlogs.install(fmt=f'%(asctime)s,%(name)s,%(levelname)s,{model_name}: %(message)s', logger=logger)
-
-    log_dir = Path('.')/'logs' if log_dir is None else Path(log_dir)
-    if not log_dir.exists():
-        print('Log dir changed to current folder.')
-        log_dir = Path('.')
-    # Create a file handler object
-    fh = logging.FileHandler(f'{(log_dir / (model_name+("_eval"if evaluate_only else "")))}.log')
-    fh.setLevel(logging.DEBUG if debug else logging.INFO)
-    # Create a ColoredFormatter to use as formatter for the FileHandler
-    formatter = coloredlogs.ColoredFormatter(f'%(asctime)s,%(levelname)s,{model_name}_{trainId}: %(message)s')
-    fh.setFormatter(formatter)
-    logger.addHandler(fh)
+    # coloredlogs.install(fmt=f'%(asctime)s,%(name)s,%(levelname)s,{model_name}: %(message)s', logger=logger)
+    #
+    # log_dir = Path('.')/'logs' if log_dir is None else Path(log_dir)
+    # if not log_dir.exists():
+    #     print('Log dir changed to current folder.')
+    #     log_dir = Path('.')
+    # # Create a file handler object
+    # fh = logging.FileHandler(f'{(log_dir / (model_name+("_eval"if evaluate_only else "")))}.log')
+    # fh.setLevel(logging.DEBUG if debug else logging.INFO)
+    # # Create a ColoredFormatter to use as formatter for the FileHandler
+    # formatter = coloredlogs.ColoredFormatter(f'%(asctime)s,%(levelname)s,{model_name}_{trainId}: %(message)s')
+    # fh.setFormatter(formatter)
+    # logger.addHandler(fh)
 
     # filter log modules matplotlib.category
     logger_urllib3 = logging.getLogger('urllib3')
@@ -170,6 +172,25 @@ def main(train_stock, val_stock, window_size, batch_size, ep_count
 
 
     if not evaluate_only:
+
+        # coloredlogs.install(fmt=f'%(asctime)s,%(name)s,%(levelname)s,{model_name}: %(message)s', logger=logger)
+        #
+        try:
+            log_dir = Path('.')/'logs' if log_dir is None else Path(log_dir)
+            if not log_dir.exists():
+                print('Log dir changed to current folder.')
+                log_dir = Path('.')
+            # # Create a file handler object
+            fh = logging.FileHandler(f'{(log_dir / (model_name+("_eval"if evaluate_only else "")))}.log')
+            fh.setLevel(logging.DEBUG if debug else logging.INFO)
+            # # Create a ColoredFormatter to use as formatter for the FileHandler
+            formatter = logging.Formatter(f'%(asctime)s,%(levelname)s,{model_name}_{trainId}: %(message)s')
+            fh.setFormatter(formatter)
+            trainLogger = logging.getLogger('trading_bot.methodsCap')
+            trainLogger.addHandler(fh)
+        except Exception as e:
+            logger.error(e)
+
         train_data = Data(train_stock if train_stock else dataPath, tfCounts=tfCounts, tik=tik, tFrame=tFrame,
                               dFrom=dFrom,
                               dTo=dTo,
@@ -326,8 +347,6 @@ if __name__ == "__main__":
     if not strategy in ["t-dqn", "double-dqn", "dqn"]:
         raise RuntimeError(f'There is no data dir at {Path(dataPath).absolute()}.')
 
-    from trading_bot.agent import switch_k_backend_device
-    # from trading_bot.agent import AgentF as Agent
     from trading_bot.methodsCap import train_model, evaluate_model
 
     # switch_k_backend_device()
