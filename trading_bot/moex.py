@@ -192,7 +192,9 @@ def secInfo(secid):
           if not res['securities']['data']:
               print(f'Error loading {secid}')
               return None
-          row = [row for row in res['securities']['data'] if secid in [row[1],row[2],row[5]] ]
+          indices = [i for i, x in enumerate(res['securities']['columns']) if
+                     x in ['secid', 'shortname', 'regnumber', 'name']]
+          row = [row for row in res['securities']['data'] if secid in [row[i] for i in indices]] #[row for row in res['securities']['data'] if secid in [row[1],row[2],row[5]] ]
           if any(row):
             # typeSecuritiesFound = namedtuple('sec', res['securities']['columns'])
             res['securities']['data'] = row
