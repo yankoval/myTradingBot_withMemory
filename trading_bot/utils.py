@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from scipy.special import expit
 from qbroker.broker import Position
 from trading_bot.ops import OHLCVtoSeries, fractalsExp, get_state3
-from trading_bot.moex import candles
+from moex import candles #trading_bot
 from dateutil import parser
 from sklearn.cluster import KMeans
 
