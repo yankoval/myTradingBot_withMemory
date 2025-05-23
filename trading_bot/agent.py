@@ -65,7 +65,7 @@ class Agent:
         self.strategy = strategy
 
         # agent config
-        self.state_size = (state_size,) if state_size is int else state_size    	# normalized previous days
+        self.state_size = (state_size,) if type(state_size) is int else state_size    	# normalized previous days
         self.action_size = 3           		# [sit, buy, sell]
         self.inventory = []
         self.memory = deque(maxlen=10000)
