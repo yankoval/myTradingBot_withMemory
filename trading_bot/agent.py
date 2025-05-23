@@ -65,7 +65,7 @@ class Agent:
         self.strategy = strategy
 
         # agent config
-        self.state_size = state_size    	# normalized previous days
+        self.state_size = (state_size,) if state_size is int else state_size    	# normalized previous days
         self.action_size = 3           		# [sit, buy, sell]
         self.inventory = []
         self.memory = deque(maxlen=10000)
@@ -96,6 +96,7 @@ class Agent:
                 self.state_size = config["layers"][0]["config"]["batch_input_shape"][1]
             except KeyError:
                 self.state_size = config["layers"][0]["config"]['batch_shape'][1]
+            self.state_size = (self.state_size,) if self.state_size is int else self.state_size
             print(f'Loaded model at:{self.model_name}, window size:{self.state_size}.')
         else:
             self.model = self._model()
@@ -113,7 +114,7 @@ class Agent:
         """Creates the model
         """
         model = Sequential()
-        model.add(Dense(units=128, activation="relu", input_dim=self.state_size))
+        model.add(Dense(units=128, activation="relu", input_shape=self.state_size))
         model.add(Dense(units=256, activation="relu"))
         model.add(Dense(units=256, activation="relu"))
         model.add(Dense(units=128, activation="relu"))
@@ -275,7 +276,7 @@ class AgentF(Agent):
         """Creates the model
         """
         model = Sequential()
-        model.add(Dense(units=128, activation="relu", input_dim=self.state_size))
+        model.add(Dense(units=128, activation="relu", input_shape=self.state_size))
         model.add(Dense(units=256, activation="relu"))
         model.add(Dense(units=256, activation="relu"))
         model.add(Dense(units=256, activation="relu"))

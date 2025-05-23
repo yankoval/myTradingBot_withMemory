@@ -6,7 +6,7 @@ Usage:
   train.py [--train-stock=<train-stock>] [--val-stock=<val-stock>] [--agentClass=<agentClass>] [--strategy=<strategy>]
     [--window-size=<window-size>] [--batch-size=<batch-size>]
     [--episode-count=<episode-count>] [--model-name=<model-name>]
-    [--pretrained] [--debug] [--log_dir=<log_dir>][--tfCounts=<tf-Counts>]  [--tik=<tiker>]
+    [--pretrained] [--debug] [--log_dir=<log_dir>][--tfCounts=<tf-Counts>]  --tik=<tiker>
     [--tFrame=<tFrame>] [--dFrom=<dFrom>] [--dTo=<dTo>]
     [--vdFrom=<vdFrom>] [--vdTo=<vdTo>] [--start_from=<start_from>] [--trStrat=<trStrat>] [--trainId=<trainId>]
     [--dataPath=<dataPath>] [--dataClass=<dataClass>] [--evaluate_only=<evaluate_only>]

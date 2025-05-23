@@ -151,7 +151,7 @@ def evaluate_model(agent, data, window_size, debug, *args, start_from=1, **kwarg
         #print(f'Action:{action}')
         # BUY
         if action == 1:  # and len(agent.inventory) == 0:
-            res = data.broker.buy(size=size)
+            res = data.broker.buy(size=size, exectype='takeOrCancel')
             if res:
                 agent.inventory.append(-1 * size * currentDealPrice)
                 data.df.at[data.loc, 'BUY'] = size
@@ -169,7 +169,7 @@ def evaluate_model(agent, data, window_size, debug, *args, start_from=1, **kwarg
                     logger.debug(f'total_profit_:{total_profit_}, profit:{profit}, pos:{pos}, reward:{reward},')
         # SELL
         elif action == 2:  # and pos.size>0:
-            res = data.broker.sell(size=size)
+            res = data.broker.sell(size=size, exectype='takeOrCancel')
             if res:
                 # bought_price = pos.price
                 agent.inventory.append(size * currentDealPrice)
@@ -235,3 +235,4 @@ def evaluate_model(agent, data, window_size, debug, *args, start_from=1, **kwarg
 
             logger.info(f'Evaluate results. periods:{t}/{data.loc}, getStake: {data.broker.getStake(data)}')
             return total_profit, history, maxDrawdownAbs
+    raise AssertionError('Exit without done condition')

@@ -30,6 +30,8 @@ import collections
 from math import copysign
 
 # class Sizer(with_metaclass(MetaParams)):
+import logging
+logger = logging.getLogger(__name__)
 
 class CommInfoBase(with_metaclass(MetaParams)):
     '''Base Class for the Commission Schemes.
@@ -517,6 +519,15 @@ class qbroker(BrokerBase): #BrokerBase
         else:
             raise NotImplementedError
 
+        if exectype == 'takeOrCancel':
+            if data.iloc < data.df.shape[0]:
+                if not(data.df.iloc[data.iloc+1].High >= price and price >= data.df.iloc[data.iloc+1].Low):
+                    logger.debug(f'Buy/Sell takeOrCancel operation cancelled on step {data.iloc}. '
+                                 f'Price out of order:{price}. Next High:{data.df.iloc[data.iloc+1].High},'
+                                 f' next Low:{data.df.iloc[data.iloc+1].Low}')
+                    return False
+            else:
+                return False
 
         if self.kKontrol(size,price) < 0:
             return False
@@ -556,6 +567,15 @@ class qbroker(BrokerBase): #BrokerBase
             price = data.df.iloc[data.iloc].Close
         else:
             raise NotImplementedError
+        if exectype == 'takeOrCancel':
+            if data.iloc < data.df.shape[0]:
+                if not(data.df.iloc[data.iloc+1].High >= price and price >= data.df.iloc[data.iloc+1].Low):
+                    logger.debug(f'Buy/Sell takeOrCancel operation cancelled on step {data.iloc}. '
+                                 f'Price out of order:{price}. Next High:{data.df.iloc[data.iloc+1].High},'
+                                 f' next Low:{data.df.iloc[data.iloc+1].Low}')
+                    return False
+            else:
+                return False
         if self.kKontrol(-size,price) < 0:
             return False
         self.dealsHist.append(

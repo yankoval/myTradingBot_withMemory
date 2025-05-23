@@ -11,6 +11,8 @@ from trading_bot.ops import OHLCVtoSeries, fractalsExp, get_state3
 from moex import candles #trading_bot
 from dateutil import parser
 from sklearn.cluster import KMeans
+from sklearn.preprocessing import MinMaxScaler, FunctionTransformer
+from numpy.lib.stride_tricks import sliding_window_view
 
 # Formats Position
 format_position = lambda price: ('$' if price < 0 else '$') + '{0:.2f}'.format(price)
@@ -39,6 +41,22 @@ logger = logging.getLogger(__name__)
 # plt.set_loglevel('ERROR')
 # logger.debug('test')
 
+# variant from Phi 4
+# BEST VARIANT on 15/05/25
+def idxDiff(df:pd.DataFrame, col1:str='fHigh', col2:str='fLow',resCol:str='tDiff'):
+    """ Calculate index difference based on two boll columns.
+    Args:
+        df:pd.DataFrame source dataframe,
+        col1,col2:str Names of two columns with boolean to calc idx diff,
+        resCol:str name of result column to be added to df.
+    """
+    mask = (df[col1] == True) | (df[col2] == True)
+    last_true_idx = df.index.to_series().where(mask).ffill()
+    df[resCol] = df.index - last_true_idx
+    df[resCol] = df[resCol].view('int64').shift(1)
+    df[resCol] = df[resCol] + 6.000000e+10
+    df.loc[df.tDiff < 0, "tDiff"] = 6.000000e+10
+    return df
 
 def calculateFractalsPairs(df, CalculateValues=True, CalculateTimeDiff=True):
     """Calculate fractals with granted pairs sequence"""
@@ -615,30 +633,34 @@ class Data3(Data1):
             [np.array(self.fractalsValues.loc[self.fractalsValues.index < idx].Close[-self.window_size + 2:]) -
              self.df.loc[idx].nLevel for idx, row in self.df.iterrows()], index=self.df.index)
     def getProfit(self,agent,iloc):
-        inventory = agent.inventory
-        lastDealPrice = self.df['Close'].iloc[iloc]
-        # if memory have odd cnt of deals profit is sum else need last deal price
-        # stake is profit of closed dials
-        longCnt, shortCnt, totProfit, curPosProfit = 0,0,0,0
-        for i in inventory:
-            if i< 0:
-                longCnt +=1
-            else:
-                shortCnt +=1
-            if longCnt == shortCnt:
-                curPosProfit += i
-                totProfit += curPosProfit
-                curPosProfit = 0
-            else:
-                curPosProfit += i
-        if longCnt != shortCnt:
-            curPosProfit += (longCnt - shortCnt)*lastDealPrice
+        """ Return: total_profit, profit, pos, reward """
+        # 05/2025 swithched to calculate profit and pos by agent
+        # inventory = agent.inventory
+        # lastDealPrice = self.df['Close'].iloc[iloc]
+        # # if memory have odd cnt of deals profit is sum else need last deal price
+        # # stake is profit of closed dials
+        # longCnt, shortCnt, totProfit, curPosProfit = 0,0,0,0
+        # for i in inventory:
+        #     if i< 0:
+        #         longCnt +=1
+        #     else:
+        #         shortCnt +=1
+        #     if longCnt == shortCnt:
+        #         curPosProfit += i
+        #         totProfit += curPosProfit
+        #         curPosProfit = 0
+        #     else:
+        #         curPosProfit += i
+        # if longCnt != shortCnt:
+        #     curPosProfit += (longCnt - shortCnt)*lastDealPrice
         # else:
-        if len(inventory)//10000 >0:
-            raise Exception(f'inventory exceed: 10000')
-
+        # if len(inventory)//10000 >0:
+        #     raise Exception(f'inventory exceed: 10000')
+        totProfit = self.broker.get_cash() - self.broker.startingcash
+        curPosProfit = self.broker.getvalue()
+        pos = self.broker.getposition().size
         reward = expit(((totProfit-1000) / 1000)-2)-0.5 + expit(((curPosProfit-1000) / 1000)+2)-0.5
-        return totProfit, curPosProfit, (longCnt - shortCnt), reward
+        return totProfit, curPosProfit, pos, reward
     def getState(self, n_days, agent, loc=None, *args, iloc=None, **kwargs):
         """Returns an n-day state representation ending at time t
         """
@@ -707,11 +729,47 @@ class DataV303(DataV302):
         data = self.dff.iloc[iloc].apply(expit).values
         # Запишем текущий профит если сделка была
         # (totProfit, curPosProfit, pos, *results) = self.getProfit(agent, iloc)
-        totProfit = self.broker.get_cash() - self.broker.startingcash
-        totProfit = expit(((totProfit - 1000) / 1000) - 2)
-        curPosProfit = self.broker.getvalue()
-        curPosProfit = expit(((curPosProfit - 1000) / 1000) + 2)
-        pos = expit(self.broker.getposition().size)
-        finState = [totProfit, curPosProfit, pos]
-        res = np.append(np.array(finState), data[-(n_days - len(finState)):])
+        # totProfit = self.broker.get_cash() - self.broker.startingcash
+        # totProfit = expit(((totProfit - 1000) / 1000) - 2)
+        # curPosProfit = self.broker.getvalue()
+        # curPosProfit = expit(((curPosProfit - 1000) / 1000) + 2)
+        # pos = expit(self.broker.getposition().size)
+        # finState = np.array([totProfit, curPosProfit, pos])
+
+        finState = self.getProfit(agent, iloc)
+        finState = expit(finState[:3])
+        res = np.append(finState, data[-(n_days - len(finState)):])
         return np.array([res])
+
+class DataV304(DataV303):
+    """ Time diff and fractals pairs, with levels diff. Based on Data3 with bug fix in get state. """
+    # ver = 'v0304'
+    def _prepareDf(self,*args, **kwargs):
+        super(DataV303,self)._prepareDf(*args, **kwargs)
+
+        # Считаем сколько времени прошло между соседними фракталами
+        df = idxDiff(self.df)
+
+        # Log & Min-Max Normalization
+        # Step 1: Log transform
+        log_transformer = FunctionTransformer(np.log)
+        log_data = log_transformer.transform(df[["tDiff"]])
+        # Step 2: Min-Max scale
+        scaler = MinMaxScaler()
+        normalized_data = scaler.fit_transform(log_data)
+        # Нарезаем на массивы последних значени в размере window_size
+        # values = sliding_window_view(df.tDiff, self.window_size)
+        values = sliding_window_view(normalized_data.reshape(-1), self.window_size)
+        # Добовляем пустые значения в  начале что бы соответсвовало размеру индекса
+        values = np.insert(values, 0, np.array([[0] * self.window_size] * (self.window_size - 1)), axis=0)
+        self.tDiff = pd.DataFrame(values, index=self.df.index, columns=range(1, self.window_size+1))
+
+    def getState(self, n_days, agent, loc=None, *args, iloc=None, **kwargs):
+        """Returns an n-day state representation ending at time t
+        """
+        tDiff = self.tDiff.iloc[iloc].values
+        tData = self.dff.iloc[iloc].apply(expit).values
+        finState = self.getProfit(agent, iloc)
+        finState = expit(finState[:3])
+        res = np.append(finState, tData[-(n_days - len(finState)):])
+        return np.array([res,tDiff])
