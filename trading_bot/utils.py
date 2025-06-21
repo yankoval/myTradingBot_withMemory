@@ -578,7 +578,7 @@ class Data1(Data):
     ver = 'v02'
     description = 'Fractals 2 level, MA, AT, EXP,State window_size=16'
 
-    def _prepareDf(self):
+    def _prepareDf(self,*args, **kwargs):
         prepMa(self.df)
         prepAtr(self.df)
         # prepFractals(self.df)
@@ -617,8 +617,8 @@ class Data3(Data1):
         self.window_size = kwargs['window_size']
         super().__init__(*args, **kwargs)
 
-    def _prepareDf(self):
-        super()._prepareDf()
+    def _prepareDf(self,*args, **kwargs):
+        super()._prepareDf(*args, **kwargs)
         calculateFractalsPairs(self.df)
         self.fractalsValues = getStateFractalsValues(self.df)
         self.dfLevels = calcLevelsForEachInterval(self.df)
@@ -698,6 +698,7 @@ class DataV302(Data3):
     description = Data3.description + ' Fractal difference(ver2)  normalised by ATR.'
     expK = 0.001
     def _prepareDf(self,*args, **kwargs):
+        """ futuresShift set to 0 if you don`t include athe futures in state"""
         super(Data3,self)._prepareDf(*args, **kwargs)
         calculateFractalsPairs(self.df)
         self.fractalsValues = getStateFractalsValues(self.df)
@@ -710,8 +711,9 @@ class DataV302(Data3):
                     sorted(self.dfLevels.loc[idx.floor(freq='D')], key=lambda x: abs(x - row.Close) / row.Close)[0]
             except KeyError:
                 pass
+        futuresShift = kwargs.get('futuresShift', 2)
         self.dff = pd.DataFrame(
-            [self.fractalsValues.loc[self.fractalsValues.index <=idx].iloc[-self.window_size + 2:].Close.values
+            [self.fractalsValues.loc[self.fractalsValues.index <=idx].iloc[-self.window_size + futuresShift:].Close.values
              - row.nLevel for idx, row in self.df.iterrows()
              ], index=self.df.index)
 
@@ -742,10 +744,12 @@ class DataV303(DataV302):
         return np.array([res])
 
 class DataV304(DataV303):
-    """ Time diff and fractals pairs, with levels diff. Based on Data3 with bug fix in get state. """
+    """ 2D state, Time diff and fractals pairs, with levels diff. Based on Data3 with bug fix in get state.
+    futures = 3 # Price fractals,time diffs, current finance state (current pos, current profit, total profit)"""
     # ver = 'v0304'
+    futures = 3 # Price fractals,time diffs, current finance state (current pos, current profit, total profit)
     def _prepareDf(self,*args, **kwargs):
-        super(DataV303,self)._prepareDf(*args, **kwargs)
+        super(DataV303,self)._prepareDf(*args, futuresShift=0, **kwargs)
 
         # Считаем сколько времени прошло между соседними фракталами
         df = idxDiff(self.df)
@@ -767,9 +771,12 @@ class DataV304(DataV303):
     def getState(self, n_days, agent, loc=None, *args, iloc=None, **kwargs):
         """Returns an n-day state representation ending at time t
         """
-        tDiff = self.tDiff.iloc[iloc].values
-        tData = self.dff.iloc[iloc].apply(expit).values
-        finState = self.getProfit(agent, iloc)
-        finState = expit(finState[:3])
-        res = np.append(finState, tData[-(n_days - len(finState)):])
-        return np.array([res,tDiff])
+        tDiff = self.tDiff.iloc[iloc].values # Get fractal time diffs (time beetwin fractals)
+        tData = self.dff.iloc[iloc].apply(expit).values # Get fractal values (extremum prices)
+        finState = self.getProfit(agent, iloc)[:3] # Get financial state exept reward ( pos, curent profit, total profit etc.)
+        finState = list(finState) + [0]*(self.window_size - len(finState)) # Expand future to window size
+        finState = expit(finState)
+        res = np.array([finState, tData, tDiff])
+        res = res.transpose()
+        res = np.expand_dims(res, axis=0)
+        return res

@@ -85,7 +85,6 @@ Broker fee (Finam)
 """
 import logging
 import logging.config
-import coloredlogs
 import traceback
 from pathlib import Path
 
@@ -344,6 +343,8 @@ if __name__ == "__main__":
     # Check path to data:
     if not Path(dataPath).is_dir():
         raise RuntimeError(f'There is no data dir at {Path(dataPath).absolute()}.')
+    assert vdTo >= start_from, 'vdTo < start_from is invalid.'
+    assert dTo >= start_from, 'dTo < start_from is invalid.'
 
     # Check strategy
     if not strategy in ["t-dqn", "double-dqn", "dqn"]:

@@ -4,6 +4,7 @@ from collections import deque
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.keras import layers
 import os
 
 
@@ -11,7 +12,7 @@ import tensorflow.keras.backend as K
 
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.models import load_model, clone_model
-from tensorflow.keras.layers import Dense, LSTM
+from tensorflow.keras.layers import Dense, Conv1D, MaxPooling1D, Flatten
 #from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.optimizers import Adam
 from pathlib import Path
@@ -43,6 +44,7 @@ class Agent:
     """ Stock Trading Bot """
     ver = 'v03'
     description = 'Base q-lerning agen and model'
+    strategyList = ["t-dqn", "double-dqn", "dqn"]
 
     def __init__(self, state_size, strategy="t-dqn", reset_every=1000
                  , pretrained=False, model_name=None,modelPath=None, epsilonInit=0.99):
@@ -60,12 +62,12 @@ class Agent:
             tf.config.experimental.set_memory_growth(physical_devices[0], True)
             logger.info(f'Device svitched off: {physical_devices}')
         # Check strategy
-        if strategy not in ["t-dqn", "double-dqn", "dqn"]:
-            raise
+        if strategy not in Agent.strategyList:
+            raise AssertionError(f'Invalid strategy {strategy}')
         self.strategy = strategy
 
         # agent config
-        self.state_size = (state_size,) if type(state_size) is int else state_size    	# normalized previous days
+        self.state_size = state_size    	# normalized previous days
         self.action_size = 3           		# [sit, buy, sell]
         self.inventory = []
         self.memory = deque(maxlen=10000)
@@ -96,7 +98,6 @@ class Agent:
                 self.state_size = config["layers"][0]["config"]["batch_input_shape"][1]
             except KeyError:
                 self.state_size = config["layers"][0]["config"]['batch_shape'][1]
-            self.state_size = (self.state_size,) if self.state_size is int else self.state_size
             print(f'Loaded model at:{self.model_name}, window size:{self.state_size}.')
         else:
             self.model = self._model()
@@ -114,7 +115,7 @@ class Agent:
         """Creates the model
         """
         model = Sequential()
-        model.add(Dense(units=128, activation="relu", input_shape=self.state_size))
+        model.add(Dense(units=128, activation="relu", input_dim=self.state_size))
         model.add(Dense(units=256, activation="relu"))
         model.add(Dense(units=256, activation="relu"))
         model.add(Dense(units=128, activation="relu"))
@@ -276,7 +277,7 @@ class AgentF(Agent):
         """Creates the model
         """
         model = Sequential()
-        model.add(Dense(units=128, activation="relu", input_shape=self.state_size))
+        model.add(Dense(units=128, activation="relu", input_dim=self.state_size))
         model.add(Dense(units=256, activation="relu"))
         model.add(Dense(units=256, activation="relu"))
         model.add(Dense(units=256, activation="relu"))
@@ -285,3 +286,66 @@ class AgentF(Agent):
 
         model.compile(loss=self.loss, optimizer=self.optimizer)
         return model
+
+class TDQNConvModel(tf.keras.Model):
+    """ Uncomputable!   2D convolution input layer model."""
+    def __init__(self, num_actions):
+        super(TDQNConvModel, self).__init__()
+        # Assuming the input OHLCV data will have a shape of (sequence_length, 5)
+        # We can use a convolutional layer to extract features from the time series data
+        self.conv1 = layers.Conv1D(filters=32, kernel_size=3, activation='relu', padding='same')
+        self.pool1 = layers.MaxPooling1D(pool_size=2)
+        self.conv2 = layers.Conv1D(filters=64, kernel_size=3, activation='relu', padding='same')
+        self.pool2 = layers.MaxPooling1D(pool_size=2)
+        self.flatten = layers.Flatten()
+        self.dense1 = layers.Dense(128, activation='relu')
+        self.output_layer = layers.Dense(num_actions) # Output Q-values for each action
+
+    def call(self, inputs):
+        # Input shape: (batch_size, sequence_length, 5)
+        x = self.conv1(inputs)
+        x = self.pool1(x)
+        x = self.conv2(x)
+        x = self.pool2(x)
+        x = self.flatten(x)
+        x = self.dense1(x)
+        return self.output_layer(x)
+class Agent2DConv(Agent):
+    """ 2D convolution input layer model."""
+    ver = Agent.ver+'-4'
+    description = 'Base q-lerning agen and model for 2D conv layers. Keras 3 file format'
+    num_features = 3
+    # def _model(self, *args, **kwargs):
+    #     super(Agent, self).__init__(*args,**kwargs)
+    #     assert len(args) == 1, 'Wrong pos args'
+    #     self.state_size =
+
+    def _model(self):
+        """Creates the model
+        """
+        model = Sequential()
+        model.add(Conv1D(filters=32, kernel_size=3, activation='relu', padding='same')) #,input_shape=(2,self.state_size)
+        model.add(MaxPooling1D(pool_size=2))
+        model.add(Conv1D(filters=64, kernel_size=3, activation='relu', padding='same'))
+        model.add(MaxPooling1D(pool_size=2))
+        model.add(Flatten())
+        model.add(Dense(units=128, activation="relu"))
+        model.add(Dense(units=256, activation="relu"))
+        model.add(Dense(units=128, activation="relu"))
+        model.add(Dense(units=self.action_size))
+
+        model.compile(loss=self.loss, optimizer=self.optimizer)
+
+        batch_size = 4
+        sequence_length = self.state_size  # Example sequence length
+        dummy_input = tf.random.normal(shape=(batch_size, sequence_length, Agent2DConv.num_features))
+
+        # Get the model's output (Q-values)
+        q_values = model(dummy_input)
+
+        return model
+        # """Creates the model
+        # """
+        # model = TDQNConvModel(num_actions=self.action_size)
+        # model.compile(loss=self.loss, optimizer=self.optimizer)
+        # return model
