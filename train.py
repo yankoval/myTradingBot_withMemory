@@ -344,7 +344,8 @@ if __name__ == "__main__":
     if not Path(dataPath).is_dir():
         raise RuntimeError(f'There is no data dir at {Path(dataPath).absolute()}.')
     assert vdTo >= start_from, 'vdTo < start_from is invalid.'
-    assert dTo >= start_from, 'dTo < start_from is invalid.'
+    if dTo:
+        assert dTo >= start_from, 'dTo < start_from is invalid.'
 
     # Check strategy
     if not strategy in ["t-dqn", "double-dqn", "dqn"]:
